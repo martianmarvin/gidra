@@ -1,10 +1,10 @@
 package sleep
 
 import (
-	"errors"
 	"time"
 
 	"github.com/martianmarvin/gidra/task"
+	"github.com/mitchellh/mapstructure"
 )
 
 // Sleeps for specified number of seconds
@@ -12,49 +12,31 @@ import (
 // - seconds number of seconds to sleep
 
 func init() {
-	task.Register("sleep", NewSleepTask)
+	task.Register("sleep", NewTask)
 }
 
-type SleepTask struct {
+type Task struct {
+	task.BaseTask
+
+	Config *Config
 }
 
-func NewSleepTask() task.Task {
-	return &SleepTask{}
+type Config struct {
+	Seconds time.Duration
 }
 
-func parseSeconds(v interface{}) time.Duration {
-	switch n := v.(type) {
-	case time.Duration:
-		return n * time.Second
-	case int:
-		return time.Duration(n) * time.Second
-	case int32:
-		return time.Duration(n) * time.Second
-	case int64:
-		return time.Duration(n) * time.Second
-	case string:
-		d, err := time.ParseDuration(n)
-		if err != nil {
-			return time.Duration(0)
-		}
-		if d > time.Second {
-			return d
-		} else {
-			return d * time.Second
-		}
-	default:
-		return time.Duration(0)
-
+func NewTask() task.Task {
+	return &Task{
+		BaseTask: task.BaseTask{},
+		Config:   &Config{},
 	}
 }
 
-func (t *SleepTask) Execute(vars map[string]interface{}) (err error) {
-	if v, ok := vars["seconds"]; !ok {
-		err = errors.New("Missing required parameter: seconds")
+func (t *Task) Execute(vars map[string]interface{}) (err error) {
+	if err = mapstructure.Decode(vars, t.Config); err != nil {
 		return
-	} else {
-		time.Sleep(parseSeconds(v))
 	}
+	time.Sleep(t.Config.Seconds * time.Second)
 
 	return err
 }
