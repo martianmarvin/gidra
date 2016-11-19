@@ -34,9 +34,9 @@ before:
 
 tasks:
   - get:
-      url: {{ Vars.host }}
+      url: {{ .Vars.host }}
       success:
-        when: '{{ .Status == 200 }}'
+        when: '{{ .Page.Status == 200 }}'
   - extract:
       regex: 'csrf_token="(.*)"'
       as: csrf_token
