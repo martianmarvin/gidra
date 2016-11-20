@@ -26,14 +26,6 @@ type Task interface {
 
 type newTaskFunc func() Task
 
-// BaseTask includes fields common to all tasks
-type BaseTask struct {
-	//Id is the number of this task in the sequence
-	Id int
-	//Vars are all of the variables available to this task
-	Vars map[string]string
-}
-
 //Register registers a new type of task, making it available to scripts
 func Register(action string, fn newTaskFunc) {
 	tasksMu.Lock()

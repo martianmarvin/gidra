@@ -1,10 +1,10 @@
 package sleep
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/martianmarvin/gidra/task"
-	"github.com/mitchellh/mapstructure"
 )
 
 // Sleeps for specified number of seconds
@@ -22,7 +22,7 @@ type Task struct {
 }
 
 type Config struct {
-	Seconds time.Duration
+	Duration time.Duration `task:"seconds,required"`
 }
 
 func NewTask() task.Task {
@@ -33,10 +33,12 @@ func NewTask() task.Task {
 }
 
 func (t *Task) Execute(vars map[string]interface{}) (err error) {
-	if err = mapstructure.Decode(vars, t.Config); err != nil {
-		return
+	if err = task.Configure(t, vars); err != nil {
+		return err
 	}
-	time.Sleep(t.Config.Seconds * time.Second)
+	t.Config.Duration *= time.Second
+	fmt.Println(t.Config)
+	time.Sleep(t.Config.Duration)
 
 	return err
 }
