@@ -15,6 +15,7 @@ type Script struct {
 
 	//BeforeSequence is the sequence to run before running the main one
 	BeforeSequence *Sequence
+
 	//AfterSequence is the sequence to run before running the main one
 	AfterSequence *Sequence
 }
