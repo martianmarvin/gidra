@@ -1,23 +1,35 @@
 package script
 
-import "github.com/martianmarvin/gidra/task"
+import (
+	"github.com/martianmarvin/gidra/fastcookiejar"
+	"github.com/martianmarvin/gidra/task"
+	"github.com/valyala/fasthttp"
+)
 
 // Sequence is a series of tasks that represent a single iteration of the loop
 type Sequence struct {
 	//Tasks is the list of tasks in this sequence
-	Tasks []*task.Task
+	Tasks []task.Task
 
 	//The sequence id of the current task
 	n int
 
 	//List of errors from tasks(not including retries)
 	errors []error
+
+	//The cookie jar shared between tasks in this sequence
+	cj *fastcookiejar.Jar
+
+	//The persistent http client for this sequence
+	client *fasthttp.Client
 }
 
 func NewSequence() *Sequence {
 	return &Sequence{
-		Tasks:  make([]*task.Task, 0),
+		Tasks:  make([]task.Task, 0),
 		errors: make([]error, 0),
+		cj:     fastcookiejar.New(),
+		client: &fasthttp.Client{},
 	}
 }
 
@@ -34,7 +46,7 @@ func (s *Sequence) Completed() bool {
 //Add adds a new task to the sequence and returns the number of tasks in the
 //sequence
 // Like all Sequence methods, this is not concurrency-safe
-func (s *Sequence) Add(task *task.Task) int {
+func (s *Sequence) Add(task task.Task) int {
 	s.Tasks = append(s.Tasks, task)
 	s.n += 1
 	return s.n
