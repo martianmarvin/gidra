@@ -1,9 +1,8 @@
 package script
 
 import (
-	"github.com/martianmarvin/gidra/fastcookiejar"
+	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
-	"github.com/valyala/fasthttp"
 )
 
 var (
@@ -24,25 +23,23 @@ type Sequence struct {
 	//List of errors from tasks(not including retries)
 	errors []error
 
-	//Sequence-global variables, set per iteration
+	//Sequence-global variables/config, set per iteration
 	Vars map[string]interface{}
 
-	//The cookie jar shared between tasks in this sequence
-	CookieJar *fastcookiejar.Jar
-
-	//The persistent http client for this sequence
-	Client *fasthttp.Client
+	//HTTP Client shared by all requests in this sequence
+	Client client.Client
 }
 
 func NewSequence() *Sequence {
-	return &Sequence{
-		Tasks:     make([]task.Task, 0),
-		errors:    make([]error, 0),
-		Vars:      make(map[string]interface{}),
-		CookieJar: fastcookiejar.New(),
-		Client:    &fasthttp.Client{},
-		retries:   DefaultRetries,
+	s := &Sequence{
+		Tasks:   make([]task.Task, 0),
+		errors:  make([]error, 0),
+		Vars:    make(map[string]interface{}),
+		Client:  client.NewHTTPClient(),
+		retries: DefaultRetries,
 	}
+
+	return s
 }
 
 //Success indicates whether the sequence completed successfully
@@ -89,12 +86,12 @@ func (s *Sequence) Step() int {
 func (s *Sequence) Execute() []error {
 	for n, t := range s.Tasks[s.n:] {
 		s.n = n
-		err := t.Execute(s.Vars)
+		err := t.Execute(s.Client, s.Vars)
 		s.errors[n] = err
 		switch err {
 		case task.ErrRetry:
 			for i := 0; i < s.retries; i++ {
-				err = t.Execute(s.Vars)
+				err = t.Execute(s.Client, s.Vars)
 				s.errors[n] = err
 				if err != task.ErrRetry {
 					break
@@ -111,6 +108,5 @@ func (s *Sequence) Execute() []error {
 			continue
 		}
 	}
-
 	return s.errors
 }

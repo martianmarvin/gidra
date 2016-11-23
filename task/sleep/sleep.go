@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
 )
 
@@ -32,7 +33,7 @@ func NewTask() task.Task {
 	}
 }
 
-func (t *Task) Execute(vars map[string]interface{}) (err error) {
+func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err error) {
 	if err = task.Configure(t, vars); err != nil {
 		return err
 	}

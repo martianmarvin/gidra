@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sort"
 	"sync"
+
+	"github.com/martianmarvin/gidra/client"
 )
 
 //Errors represent status of a task that failed to complete
@@ -16,12 +18,14 @@ var (
 
 	tasksMu         sync.RWMutex
 	registeredTasks = make(map[string]newTaskFunc)
+
+	defaultClient = client.NewHTTPClient()
 )
 
 // Task is a single step in a Script
 type Task interface {
 	// Execute executes the task and returns an error if it did not complete
-	Execute(vars map[string]interface{}) error
+	Execute(client client.Client, vars map[string]interface{}) error
 }
 
 type newTaskFunc func() Task
@@ -63,5 +67,5 @@ func New(action string) Task {
 //Run runs a task immediately, out of sequence
 func Run(action string, vars map[string]interface{}) error {
 	t := New(action)
-	return t.Execute(vars)
+	return t.Execute(defaultClient, vars)
 }

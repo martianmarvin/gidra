@@ -66,10 +66,23 @@ func (j *Jar) SetCookies(cookies []*fasthttp.Cookie) {
 //Set sets a cookie from a key, value pair
 func (j *Jar) Set(domain, key, value string) {
 	var fastcookies []*fasthttp.Cookie
-	j.SetCookies(fastcookies)
 	ck := newCookie(domain, key, value)
 	fastcookies = append(fastcookies, ck)
 	j.SetCookies(fastcookies)
+}
+
+//SetBytes sets a cookie from a key,value pair of bytes
+//value is the full set-cookie header
+//Meant to be used with fasthttp.VisitAllCookie
+func (j *Jar) SetBytes(key, value []byte) {
+	var fastcookies []*fasthttp.Cookie
+	ck := fasthttp.AcquireCookie()
+	ck.SetKeyBytes(key)
+	err := ck.ParseBytes(value)
+	if err == nil {
+		fastcookies = append(fastcookies, ck)
+		j.SetCookies(fastcookies)
+	}
 }
 
 //SetMap sets a cookie from a map of strings
@@ -102,5 +115,9 @@ func parseDomain(domain string) string {
 
 //Cookies returns a slice of all global cookies and any matching this domain
 func (j *Jar) Cookies(domain string) (cookies []*fasthttp.Cookie) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	cookies = append(cookies, j.entries["."]...)
+	cookies = append(cookies, j.entries[domain]...)
 	return cookies
 }
