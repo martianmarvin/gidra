@@ -18,8 +18,6 @@ var (
 
 	tasksMu         sync.RWMutex
 	registeredTasks = make(map[string]newTaskFunc)
-
-	defaultClient = client.NewHTTPClient()
 )
 
 // Task is a single step in a Script
@@ -65,7 +63,7 @@ func New(action string) Task {
 }
 
 //Run runs a task immediately, out of sequence
-func Run(action string, vars map[string]interface{}) error {
+func Run(c client.Client, action string, vars map[string]interface{}) error {
 	t := New(action)
-	return t.Execute(defaultClient, vars)
+	return t.Execute(c, vars)
 }

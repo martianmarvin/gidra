@@ -26,16 +26,16 @@ type Sequence struct {
 	//Sequence-global variables/config, set per iteration
 	Vars map[string]interface{}
 
-	//HTTP Client shared by all requests in this sequence
+	//Client shared by all requests in this sequence
 	Client client.Client
 }
 
-func NewSequence() *Sequence {
+func NewSequence(c client.Client) *Sequence {
 	s := &Sequence{
 		Tasks:   make([]task.Task, 0),
 		errors:  make([]error, 0),
 		Vars:    make(map[string]interface{}),
-		Client:  client.NewHTTPClient(),
+		Client:  c,
 		retries: DefaultRetries,
 	}
 

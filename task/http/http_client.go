@@ -1,4 +1,4 @@
-package client
+package http
 
 import (
 	"net"
@@ -53,9 +53,12 @@ func (c *FastHTTPClient) Dial(addr string, proxy *url.URL) (net.Conn, error) {
 	return c.dialer.Dial(addr, proxy)
 }
 
-//Close closes the underlying connection
+//Close closes the underlying connection and releases all responses
 func (c *FastHTTPClient) Close() error {
 	var err error
+	for _, resp := range c.Responses {
+		fasthttp.ReleaseResponse(resp)
+	}
 	return err
 }
 
