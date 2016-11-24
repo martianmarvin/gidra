@@ -12,16 +12,15 @@ import (
 type Client interface {
 	Dial(addr string, proxy *url.URL) (net.Conn, error)
 	Close() error
+	//Response returns the full text of the last successful response from request made by
+	//this client as a byte array
+	Response() []byte
 }
 
 type HTTPClient interface {
 	Client
 	//Do executes the request and saves the response on the client
 	Do(req *fasthttp.Request, proxy *url.URL) error
-
-	//Response returns the last successful response from request made by
-	//this client
-	Response() *fasthttp.Response
 }
 
 type MailClient interface {

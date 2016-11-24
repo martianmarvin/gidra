@@ -1,6 +1,8 @@
 package http
 
 import (
+	"bufio"
+	"bytes"
 	"net"
 	"net/url"
 	"time"
@@ -131,13 +133,29 @@ func (c *FastHTTPClient) Do(req *fasthttp.Request, proxy *url.URL) error {
 	return err
 }
 
+//Parses fasthttp response to text
+func parseResponse(resp *fasthttp.Response) []byte {
+	if resp == nil {
+		return []byte{}
+	}
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	resp.WriteTo(w)
+	return buf.Bytes()
+}
+
 //Response returns the response for this client's most recent request, or nil
 //if the most recent request had an error
-func (c *FastHTTPClient) Response() *fasthttp.Response {
+//The response is released after being read and should not be accessed again
+func (c *FastHTTPClient) Response() []byte {
+	var text []byte
 	n := len(c.Responses)
 	if n == 0 {
-		return nil
+		return text
 	} else {
-		return c.Responses[n-1]
+		resp := c.Responses[n-1]
+		text = parseResponse(resp)
+		fasthttp.ReleaseResponse(resp)
+		return text
 	}
 }
