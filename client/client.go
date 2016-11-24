@@ -16,11 +16,15 @@ type Client interface {
 
 type HTTPClient interface {
 	Client
-	Do(*fasthttp.Request) (*fasthttp.Response, error)
+	//Do executes the request and saves the response on the client
+	Do(req *fasthttp.Request, proxy *url.URL) error
+
+	//Response returns the last successful response from request made by
+	//this client
+	Response() *fasthttp.Response
 }
 
 type MailClient interface {
-	Client
 	Login(email, password string) error
 	//TODO: mail Message struct
 	Search(kw string) interface{}

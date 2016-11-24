@@ -1,12 +1,16 @@
 package http
 
 import (
-	"fmt"
+	"errors"
 	"net/url"
 
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/valyala/fasthttp"
+)
+
+var (
+	ErrBadClient = errors.New("Invalid client, HTTPClient is required for this task")
 )
 
 type Task struct {
@@ -30,25 +34,30 @@ type Config struct {
 
 	Body []byte
 
-	Client client.Client
+	Client client.HTTPClient
 }
 
-func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err error) {
+func (t *Task) Execute(c client.Client, vars map[string]interface{}) (err error) {
 	if err = task.Configure(t, vars); err != nil {
 		return err
 	}
-	t.Config.Client = client
+	//TODO idiomatic Dialer instead of proxy
+	req := t.buildRequest()
 
-	fmt.Println(t.Config)
+	httpclient, ok := c.(client.HTTPClient)
+	if !ok {
+		return ErrBadClient
+	}
+
+	t.Config.Client = httpclient
+
+	err = httpclient.Do(req, t.Config.Proxy)
 
 	return err
 }
 
 //Build HTTP request based on config
 func (t *Task) buildRequest() (req *fasthttp.Request) {
-	if t.Config.Proxy != nil {
-		//TODO Set proxy dialer
-	}
 	req = fasthttp.AcquireRequest()
 	req.Header.SetMethodBytes(t.Config.Method)
 	req.SetRequestURI(t.Config.URL)

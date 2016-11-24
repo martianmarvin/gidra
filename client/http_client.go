@@ -31,6 +31,9 @@ type FastHTTPClient struct {
 	Timeout time.Duration
 
 	FollowRedirects bool
+
+	//All responses from requests made by this client
+	Responses []*fasthttp.Response
 }
 
 func NewHTTPClient() *FastHTTPClient {
@@ -40,6 +43,7 @@ func NewHTTPClient() *FastHTTPClient {
 		Jar:             fastcookiejar.New(),
 		Timeout:         defaultTimeout,
 		FollowRedirects: true,
+		Responses:       make([]*fasthttp.Response, 0),
 	}
 	c.client.Dial = c.dialer.FastDial
 	return c
@@ -83,8 +87,10 @@ func getRedirectURL(baseURL string, location []byte) string {
 
 //Do executes the request, applying all client-global options and returns the
 //response
-func (c *FastHTTPClient) Do(req *fasthttp.Request) (*fasthttp.Response, error) {
+func (c *FastHTTPClient) Do(req *fasthttp.Request, proxy *url.URL) error {
 	var err error
+
+	c.dialer.Proxy = proxy
 
 	req = c.buildRequest(req)
 	resp := fasthttp.AcquireResponse()
@@ -112,6 +118,23 @@ func (c *FastHTTPClient) Do(req *fasthttp.Request) (*fasthttp.Response, error) {
 	}
 
 	fasthttp.ReleaseRequest(req)
+	if err != nil {
+		fasthttp.ReleaseResponse(resp)
+		c.Responses = append(c.Responses, nil)
+	} else {
+		c.Responses = append(c.Responses, resp)
+	}
 
-	return resp, err
+	return err
+}
+
+//Response returns the response for this client's most recent request, or nil
+//if the most recent request had an error
+func (c *FastHTTPClient) Response() *fasthttp.Response {
+	n := len(c.Responses)
+	if n == 0 {
+		return nil
+	} else {
+		return c.Responses[n-1]
+	}
 }
