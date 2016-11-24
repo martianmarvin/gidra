@@ -22,7 +22,7 @@ type Task struct {
 type Config struct {
 	Method []byte `task:"required"`
 
-	URL string `task:"required"`
+	URL string `task:"url,required"`
 
 	Proxy *url.URL
 
@@ -38,6 +38,9 @@ type Config struct {
 }
 
 func (t *Task) Execute(c client.Client, vars map[string]interface{}) (err error) {
+	if _, ok := vars["method"]; !ok {
+		vars["method"] = t.Config.Method
+	}
 	if err = task.Configure(t, vars); err != nil {
 		return err
 	}
