@@ -73,8 +73,16 @@ func matchByRegex(matcher *regexp.Regexp, text []byte) bool {
 }
 
 //ExtractByRegex extracts the specified value from the page via a regex
-func extractByRegex(matcher *regexp.Regexp, text []byte) string {
-	return string(matcher.Find(text))
+func extractByRegex(matcher *regexp.Regexp, text []byte) []string {
+	var results []string
+	matches := matcher.FindSubmatch(text)
+	if len(matches) < 2 {
+		return results
+	}
+	for _, result := range matches[1:] {
+		results = append(results, string(result))
+	}
+	return results
 }
 
 func findByElement(matcher cascadia.Selector, text []byte) *goquery.Selection {
@@ -98,20 +106,36 @@ func matchByElement(matcher cascadia.Selector, text []byte) bool {
 
 //ExtractByElement extracts the specified value from the page via a
 //goquery selector
-func extractByElement(matcher cascadia.Selector, text []byte) string {
-	el := findByElement(matcher, text)
-	return el.Text()
+func extractByElement(matcher cascadia.Selector, text []byte) []string {
+	els := findByElement(matcher, text)
+	return els.Map(func(n int, el *goquery.Selection) string {
+		return el.Text()
+	})
 }
 
 // Execute extracts specified text
 func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err error) {
-	var res string
+	var results []string
+	var rk string
+
 	if err = task.Configure(t, vars); err != nil {
 		return err
 	}
+
+	if len(t.Config.Key) > 0 {
+		rk = t.Config.Key
+	} else {
+		rk = "extracted"
+	}
+
 	if len(t.Config.ElementSelector) == 0 &&
 		len(t.Config.RegexSelector) == 0 {
 		return errors.New("A regex or element selector is required to extract")
+	}
+
+	_, ok := vars[rk]
+	if !ok {
+		vars[rk] = make([]string, 0)
 	}
 
 	text := client.Response()
@@ -124,27 +148,26 @@ func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err e
 		if err != nil {
 			return err
 		}
-		res = extractByElement(matcher, text)
+		results = extractByElement(matcher, text)
 	} else if len(t.Config.RegexSelector) > 0 {
 		matcher, err := regexMatcher(t.Config.RegexSelector)
 		if err != nil {
 			return err
 		}
-		res = extractByRegex(matcher, text)
+		results = extractByRegex(matcher, text)
 	}
 
-	if len(t.Config.Key) > 0 {
-		vars[t.Config.Key] = res
-	} else {
-		_, ok := vars["extracted"]
-		if !ok {
-			vars["extracted"] = make([]string, 0)
-		}
-		extracted, ok := vars["extracted"].([]string)
-		if !ok {
-			return errors.New("Could not append result to extracted")
-		}
-		vars["extracted"] = append(extracted, res)
+	if len(results) == 0 {
+		return err
+	}
+
+	extracted, ok := vars[rk].([]string)
+	if !ok {
+		return errors.New("Could not append result to extracted")
+	}
+
+	for _, res := range results {
+		extracted = append(extracted, res)
 	}
 
 	return err
