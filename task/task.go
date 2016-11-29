@@ -2,20 +2,13 @@
 package task
 
 import (
-	"errors"
 	"sort"
 	"sync"
 
 	"github.com/martianmarvin/gidra/client"
 )
 
-//Errors represent status of a task that failed to complete
 var (
-	ErrAbort = errors.New("Task aborted")
-	ErrRetry = errors.New("Task temporary failure, retrying")
-	ErrFail  = errors.New("Task failed, moving on")
-	ErrSkip  = errors.New("Skipping task")
-
 	tasksMu         sync.RWMutex
 	registeredTasks = make(map[string]newTaskFunc)
 )
