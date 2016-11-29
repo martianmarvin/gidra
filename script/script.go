@@ -20,10 +20,35 @@ type Script struct {
 	AfterSequence *Sequence
 }
 
-//TODO Load parsed config YAML
-// func NewScript(cfg *ScriptConfig) *Script {
-// 	return &Script{}
-// }
+//NewScript loads and parses config YAML
+func NewScript(name string) (*Script, error) {
+	var err error
+	cfg, err := parseConfig(name)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &Script{
+		Loop: cfg.UInt(cfgConfigLoop, 1),
+	}
+
+	s.BeforeSequence, err = parseSequence(cfgSeqBefore, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	s.Sequence, err = parseSequence(cfgSeqTasks, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	s.AfterSequence, err = parseSequence(cfgSeqAfter, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return s, err
+}
 
 //Finished indicates whether the script completed the current iteration or
 //if there are still more tasks remaining

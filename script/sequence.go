@@ -23,6 +23,9 @@ type Sequence struct {
 	//List of errors from tasks(not including retries)
 	errors []error
 
+	//List of conditions corresponding to tasks in the sequence
+	conditions [][]Condition
+
 	//Sequence-global variables/config, set per iteration
 	Vars map[string]interface{}
 
@@ -30,13 +33,13 @@ type Sequence struct {
 	Client client.Client
 }
 
-func NewSequence(c client.Client) *Sequence {
+func NewSequence() *Sequence {
 	s := &Sequence{
-		Tasks:   make([]task.Task, 0),
-		errors:  make([]error, 0),
-		Vars:    make(map[string]interface{}),
-		Client:  c,
-		retries: DefaultRetries,
+		Tasks:      make([]task.Task, 0),
+		errors:     make([]error, 0),
+		conditions: make([][]Condition, 0),
+		Vars:       make(map[string]interface{}),
+		retries:    DefaultRetries,
 	}
 
 	return s

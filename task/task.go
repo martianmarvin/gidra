@@ -55,6 +55,8 @@ func Tasks() []string {
 
 //New initializes and returns a task of the specified action
 func New(action string) Task {
+	tasksMu.RLock()
+	defer tasksMu.RUnlock()
 	fn, ok := registeredTasks[action]
 	if !ok {
 		panic("No such task: " + action)
