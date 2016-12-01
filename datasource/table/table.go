@@ -55,8 +55,8 @@ var (
 	}
 )
 
-// TODO Add remaining tablib supported formats
 // Wrappers for tablib functions
+// TODO Add remaining tablib supported formats
 
 func dataCSV(d *tablib.Dataset) (*tablib.Exportable, error) {
 	return d.CSV()
