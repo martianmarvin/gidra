@@ -5,6 +5,7 @@ import (
 
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
+	"github.com/martianmarvin/vars"
 )
 
 // Sequence is a series of tasks that represent a single iteration of the loop
@@ -22,7 +23,7 @@ type Sequence struct {
 	conditions [][]Condition
 
 	//Sequence-global variables/config, set per iteration
-	Vars map[string]interface{}
+	Vars *vars.Vars
 
 	//Client shared by all requests in this sequence
 	Client client.Client
@@ -33,7 +34,7 @@ func NewSequence() *Sequence {
 		Tasks:      make([]task.Task, 0),
 		errors:     make([]error, 0),
 		conditions: make([][]Condition, 0),
-		Vars:       make(map[string]interface{}),
+		Vars:       vars.New(),
 	}
 
 	return s
@@ -97,15 +98,16 @@ func (s *Sequence) executeStep(n int) error {
 	// task should be executed
 	tsk := s.Tasks[n]
 	for _, cond := range s.conditions[n] {
+		vars := s.Vars.Map()
 		for {
 			// This for loop executes inside a single condition
-			err = cond.Check(s.Vars)
+			err = cond.Check(vars)
 			switch err {
 			case nil:
 				// Only run the task if it has not yet run
 				if !runLatch {
 					//This must be a precondition
-					s.errors[n] = tsk.Execute(s.Client, s.Vars)
+					s.errors[n] = tsk.Execute(s.Client, vars)
 					runLatch = true
 				}
 				// Regardless of whether the task was run,
@@ -121,7 +123,7 @@ func (s *Sequence) executeStep(n int) error {
 				// Run task, but stay inside this condition
 				// The condition is responsible for signaling when we
 				// should stop retrying
-				s.errors[n] = tsk.Execute(s.Client, s.Vars)
+				s.errors[n] = tsk.Execute(s.Client, vars)
 				continue
 			case ErrFail:
 				return err
@@ -144,4 +146,39 @@ func (s *Sequence) Execute() []error {
 		}
 	}
 	return s.errors
+}
+
+//Clone creates a deep copy of this sequence
+func (s *Sequence) Clone() (*Sequence, error) {
+	var err error
+	seq := &Sequence{
+		Tasks:      make([]task.Task, len(s.Tasks)),
+		n:          s.n,
+		errors:     make([]error, len(s.errors)),
+		conditions: make([][]Condition, len(s.conditions)),
+		Client:     s.Client,
+	}
+
+	seq.Vars, err = s.Vars.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	copy(seq.Tasks, s.Tasks)
+	copy(seq.errors, s.errors)
+
+	for i, conds := range s.conditions {
+		seq.conditions[i] = make([]Condition, len(conds))
+		copy(seq.conditions[i], conds)
+	}
+
+	return seq, err
+}
+
+// Configure merges each map of variables, and applies them to this sequence
+// This method is safe to use concurrently from multiple goroutines
+func (s *Sequence) Configure(vars ...*vars.Vars) {
+	for _, v := range vars {
+		s.Vars.Extend(v)
+	}
 }

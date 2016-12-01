@@ -2,9 +2,11 @@ package script
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/martianmarvin/gidra/task"
+	"github.com/martianmarvin/vars"
 	"github.com/olebedev/config"
 )
 
@@ -73,4 +75,15 @@ func parseTask(key string, cfg *config.Config) (task.Task, error) {
 	err = task.Configure(tsk, taskVars)
 
 	return tsk, err
+}
+
+// Parses any number of maps into the provided Vars instance
+func parseMapVars(dst *vars.Vars, src ...map[string]interface{}) *vars.Vars {
+	for _, v := range src {
+		dst.Extend(vars.NewFromMap(v))
+	}
+	return dst
+}
+
+func parseInputVars(r io.Reader) {
 }

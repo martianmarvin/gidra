@@ -1,14 +1,28 @@
 package script
 
-//Script is the runner that contains a series of tasks
+import "github.com/martianmarvin/vars"
+
+var (
+	DefaultThreads = 100
+)
+
+//Script is the runner that executes Sequences
+// Unlike a Sequence or Task, a Script is fully concurrency-safe and executes
+// multiple Sequences concurrently
 type Script struct {
 	status int
 
-	//the id of the current iteration
-	i int
-
 	//How many times the script should loop total
 	Loop int
+
+	//Threads is the number of concurrent sequences executing
+	Threads int
+
+	// The queue of sequences to execute
+	queue chan *Sequence
+
+	// Script-global variables applied to all sequences
+	Vars *vars.Vars
 
 	//Sequence represents the main task sequence in this script
 	Sequence *Sequence
@@ -21,37 +35,60 @@ type Script struct {
 }
 
 //NewScript loads and parses config YAML
-func NewScript(name string) (*Script, error) {
-	var err error
+func NewScript() *Script {
+	return &Script{
+		queue: make(chan *Sequence, 1),
+		Vars:  vars.New(),
+	}
+}
+
+//Load loads a config file and initializes Sequences
+func (s *Script) Load(name string) (err error) {
+	vars := make(map[string]interface{})
+
 	cfg, err := parseConfig(name)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	s := &Script{
-		Loop: cfg.UInt(cfgConfigLoop, 1),
-	}
+	//TODO get loop from number of input lines if not explicitly defined
+	s.Loop = cfg.UInt(cfgConfigLoop, 1)
+	s.Threads = cfg.UInt(cfgConfigThreads, DefaultThreads)
 
 	s.BeforeSequence, err = parseSequence(cfgSeqBefore, cfg)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		s.Add(s.BeforeSequence)
 	}
 
 	s.Sequence, err = parseSequence(cfgSeqTasks, cfg)
 	if err != nil {
-		return nil, err
+		// Main sequence is required
+		return err
+	}
+
+	//TODO construct vars from input for each sequence
+	for i := 0; i <= s.Loop; i++ {
+		ivars := parseInputVars(vars)
+		seq, err := s.Sequence.Clone()
+		if err != nil {
+			return err
+		}
+		seq.Configure(s.Vars, ivars)
+		s.Add(seq)
 	}
 
 	s.AfterSequence, err = parseSequence(cfgSeqAfter, cfg)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		s.AfterSequence.Configure(s.Vars)
+		s.Add(s.AfterSequence)
 	}
 
-	return s, err
+	return err
 }
 
-//Finished indicates whether the script completed the current iteration or
-//if there are still more tasks remaining
-func (s *Script) Finished() bool {
-	return s.i > s.Loop
+// Add adds a new sequence to the Script's queue
+func (s *Script) Add(seq *Sequence) {
+	go func() {
+		s.queue <- seq
+	}()
 }
