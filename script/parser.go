@@ -5,20 +5,16 @@ import (
 	"io"
 	"path/filepath"
 
+	gidraconfig "github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/vars"
 	"github.com/olebedev/config"
 )
 
-var (
-	// ScriptDir is the default directory where script files are stored
-	ScriptDir = "./scripts"
-)
-
 // Reads a config yaml file
 func parseConfig(siteName string) (cfg *config.Config, err error) {
 	fn := siteName + ".yaml"
-	fp := filepath.Join(ScriptDir, fn)
+	fp := filepath.Join(gidraconfig.ScriptDir, fn)
 
 	cfg, err = config.ParseYamlFile(fp)
 

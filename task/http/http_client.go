@@ -8,12 +8,9 @@ import (
 	"time"
 
 	"github.com/martianmarvin/conn"
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/fastcookiejar"
 	"github.com/valyala/fasthttp"
-)
-
-var (
-	defaultTimeout = 15 * time.Second
 )
 
 type FastHTTPClient struct {
@@ -43,7 +40,7 @@ func NewHTTPClient() *FastHTTPClient {
 		client:          &fasthttp.Client{},
 		dialer:          conn.NewDialer(),
 		Jar:             fastcookiejar.New(),
-		Timeout:         defaultTimeout,
+		Timeout:         config.Timeout,
 		FollowRedirects: true,
 		Responses:       make([]*fasthttp.Response, 0),
 	}
