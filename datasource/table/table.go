@@ -2,8 +2,6 @@
 package table
 
 import (
-	"io"
-
 	tablib "github.com/agrison/go-tablib"
 	"github.com/martianmarvin/gidra/datasource"
 )
@@ -11,20 +9,23 @@ import (
 func init() {
 	// Register supported adapters
 	for format, importer := range importers {
-		datasource.RegisterReader(format, func(r io.Reader) (datasource.ReadableTable, error) {
-			var err error
-			reader := NewReader(importer)
-			_, err = reader.ReadFrom(r)
-			return reader, err
-		})
+		func(fn importFunc) {
+			datasource.RegisterReader(format,
+				func() datasource.ReadableTable {
+					reader := NewReader(fn)
+					return reader
+				})
+		}(importer)
 	}
 
 	for format, exporter := range exporters {
-		datasource.RegisterWriter(format, func(w io.Writer) (datasource.WriteableTable, error) {
-			var err error
-			writer := NewWriter(exporter)
-			return writer, err
-		})
+		func(fn exportFunc) {
+			datasource.RegisterWriter(format,
+				func() datasource.WriteableTable {
+					writer := NewWriter(fn)
+					return writer
+				})
+		}(exporter)
 	}
 }
 

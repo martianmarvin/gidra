@@ -14,34 +14,34 @@ import (
 // Reader implements the datasource.ReadableTable interface.
 
 type Reader struct {
-	// The underlying reader to get data from
-	reader io.Reader
+	// The current row we are iterating through
+	// IMPORTANT : The index must be the first field defined in the struct
+	// to prevent a panic in asm_386.s caused by alignment error on 32-bit
+	index int64
 
 	dataset *tablib.Dataset
 
-	// The current row we are iterating through
-	index int64
-
-	// OpenFunc loads raw data into a *tablib.Dataset used by this reader
-	OpenFunc importFunc
+	// Open loads raw data into a *tablib.Dataset used by this reader
+	Open importFunc
 }
 
 func NewReader(importer importFunc) *Reader {
 	reader := &Reader{
-		OpenFunc: importer,
+		Open:    importer,
+		dataset: &tablib.Dataset{},
 	}
 	return reader
 }
 
 //Reads all data from the underlying reader
 func (r *Reader) ReadFrom(reader io.Reader) (n int64, err error) {
-	var buf *bytes.Buffer
-	r.reader = reader
-	n, err = buf.ReadFrom(r.reader)
+	var buf bytes.Buffer
+	n, err = buf.ReadFrom(reader)
 	if err != nil {
 		return n, err
 	}
-	r.dataset, err = r.OpenFunc(buf.Bytes())
+	r.index = 0
+	r.dataset, err = r.Open(buf.Bytes())
 	return n, err
 }
 
@@ -59,11 +59,13 @@ func (r *Reader) buildRow(index int64) (row *datasource.Row, err error) {
 
 }
 
+// Next returns rows starting from the first non-header row
 func (r *Reader) Next() (*datasource.Row, error) {
-	index := atomic.AddInt64(&r.index, 1)
+	index := r.Index()
 	if index >= r.Len() {
 		return nil, io.EOF
 	} else {
+		atomic.AddInt64(&r.index, 1)
 		return r.buildRow(index)
 	}
 }

@@ -2,9 +2,6 @@ package datasource
 
 import "io"
 
-// ReaderFunc returns an open connection
-type ReaderFunc func(r io.Reader) (ReadableTable, error)
-
 type ReadableTable interface {
 	io.ReaderFrom
 

@@ -3,10 +3,20 @@
 package datasource
 
 import (
-	"io"
+	"errors"
 	"sort"
 	"sync"
 )
+
+var (
+	ErrUnsupportedType = errors.New("This file type is not supported")
+)
+
+// ReaderFunc returns a table adapter for the specified format
+type ReaderFunc func() ReadableTable
+
+// WriterFunc returns a table adapter for the specified format
+type WriterFunc func() WriteableTable
 
 var (
 	adaptersMu     sync.RWMutex
@@ -64,25 +74,28 @@ func Writers() []string {
 	return list
 }
 
-// NewReader returns a read connection for the specified data source type and name
-// To use with an io.Reader, wrap it in an ioutil.NopCloser first
-func NewReader(adapterName string, r io.ReadCloser) (ReadableTable, error) {
+// NewReader returns a read adapter for the specified data format
+func NewReader(format string) (ReadableTable, error) {
+	var err error
 	adaptersMu.RLock()
 	defer adaptersMu.RUnlock()
-	fn, ok := readerAdapters[adapterName]
+	fn, ok := readerAdapters[format]
 	if !ok {
-		panic("datasource: No reader adapter registered of type " + adapterName)
+		err = ErrUnsupportedType
+		return nil, err
 	}
-	return fn(r)
+	return fn(), err
 }
 
-// NewWriter returns a read connection for the specified data source type and name
-func NewWriter(adapterName string, w io.WriteCloser) (WriteableTable, error) {
+// NewWriter returns a write adapter for the specified data format
+func NewWriter(format string) (WriteableTable, error) {
+	var err error
 	adaptersMu.RLock()
 	defer adaptersMu.RUnlock()
-	fn, ok := writerAdapters[adapterName]
+	fn, ok := writerAdapters[format]
 	if !ok {
-		panic("datasource: No writer adapter registered of type " + adapterName)
+		err = ErrUnsupportedType
+		return nil, err
 	}
-	return fn(w)
+	return fn(), err
 }
