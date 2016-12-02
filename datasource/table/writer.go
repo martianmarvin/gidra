@@ -2,7 +2,6 @@ package table
 
 import (
 	"io"
-	"log"
 
 	tablib "github.com/agrison/go-tablib"
 	"github.com/martianmarvin/gidra/datasource"
@@ -37,7 +36,6 @@ func (w *Writer) SetColumns(cols []string) error {
 		w.dataset = tablib.NewDataset(cols)
 		return nil
 	}
-	log.Println(height, width, hwidth)
 
 	// Ensure width of current dataset matches number of columns
 	if width > hwidth {

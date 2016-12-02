@@ -53,7 +53,8 @@ func (r *Reader) buildRow(index int64) (row *datasource.Row, err error) {
 	}
 	row = datasource.NewRow()
 	row.Index = index
-	row.AppendMap(datarow)
+	row.SetColumns(r.dataset.Headers())
+	row.SetMap(datarow)
 
 	return row, err
 

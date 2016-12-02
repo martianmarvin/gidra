@@ -79,7 +79,6 @@ func TestWriter(t *testing.T) {
 
 	for {
 		row, err := reader.Next()
-		t.Log(row)
 		if err == io.EOF {
 			break
 		}

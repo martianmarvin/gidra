@@ -26,9 +26,25 @@ func NewRow() *Row {
 	}
 }
 
+// String satisfies the fmt.Stringer interface
+func (row *Row) String() string {
+	return fmt.Sprint(row.Strings())
+}
+
 // Columns returns this row's headers
 func (row *Row) Columns() []string {
 	return row.headers
+}
+
+// HasColumn returns the position of the column in the row's headers, or -1 if
+// it does not exist
+func (row *Row) ColumnIndex(col string) int {
+	for i, v := range row.headers {
+		if v == col {
+			return i
+		}
+	}
+	return -1
 }
 
 //SetColumns sets the headers for this row
@@ -105,16 +121,34 @@ func (row *Row) Append(vals ...interface{}) *Row {
 	return row
 }
 
-// AppendKV adds a new header and corresponding value to the row
-func (row *Row) AppendKV(key string, val interface{}) {
+// AppendKV adds a new header and corresponding value to the row and returns
+// the new row
+func (row *Row) AppendKV(key string, val interface{}) *Row {
 	row.headers = append(row.headers, key)
 	row.Append(val)
+	return row
 }
 
 // AppendMap unzips the provided map and appends keys to row headers and values
-// to row values
-func (row *Row) AppendMap(m map[string]interface{}) {
+// to row values and returns the new row
+func (row *Row) AppendMap(m map[string]interface{}) *Row {
 	for key, val := range m {
 		row.AppendKV(key, val)
 	}
+	return row
+}
+
+// SetMap works like AppendMap, but replaces the existing value for each of the
+// map's headers that already exist in this row's columns and returns the new
+// row. In most cases, SetMap should be used after calling SetColumns to set
+// the row's headers
+func (row *Row) SetMap(m map[string]interface{}) *Row {
+	for key, val := range m {
+		if row.ColumnIndex(key) >= 0 {
+			row.data.Set(key, val)
+		} else {
+			row.AppendKV(key, val)
+		}
+	}
+	return row
 }
