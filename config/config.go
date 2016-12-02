@@ -2,7 +2,11 @@
 // Config should not import any other subpackages to avoid circular imports
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/Sirupsen/logrus"
+)
 
 // Defaults
 var (
@@ -14,4 +18,6 @@ var (
 
 	// Location of script files
 	ScriptDir = "./scripts"
+
+	Verbosity logrus.Level = logrus.DebugLevel
 )
