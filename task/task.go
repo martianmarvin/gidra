@@ -2,10 +2,20 @@
 package task
 
 import (
+	"context"
+	"errors"
 	"sort"
 	"sync"
 
-	"github.com/martianmarvin/gidra/client"
+	"github.com/martianmarvin/gidra/log"
+	"github.com/martianmarvin/vars"
+)
+
+// Context key
+type contextKey int
+
+const (
+	ctxClient contextKey = iota
 )
 
 var (
@@ -13,13 +23,26 @@ var (
 	registeredTasks = make(map[string]newTaskFunc)
 )
 
+// Errors
+var (
+	ErrNotImplemented = errors.New("This feature is not supported by the current task")
+)
+
 // Task is a single step in a Script
 type Task interface {
 	// Execute executes the task and returns an error if it did not complete
-	Execute(client client.Client, vars map[string]interface{}) error
+	Execute(ctx context.Context)
 }
 
 type newTaskFunc func() Task
+
+// ExecFunc executes a task with the given context
+type ExecFunc func(ctx context.Context)
+
+// ExecFunc also satisfies the Task inteface
+func (f ExecFunc) Execute(ctx context.Context) {
+	f(ctx)
+}
 
 //Register registers a new type of task, making it available to scripts
 func Register(action string, fn newTaskFunc) {
@@ -46,7 +69,33 @@ func Tasks() []string {
 	return list
 }
 
+func logMiddleware(fn ExecFunc) ExecFunc {
+	return func(ctx context.Context) {
+		log.Logger.Info("Before")
+		fn(ctx)
+		log.Logger.Info("After")
+	}
+}
+
+func configMiddleware(fn ExecFunc, c Configurable) ExecFunc {
+	return func(ctx context.Context) {
+		taskVars, ok := vars.FromContext(ctx)
+		if !ok {
+			err := errors.New("No vars found on context")
+			log.Logger.Error(err)
+			return
+		}
+		if err := c.Configure(taskVars); err != nil {
+			log.Logger.Error(err)
+			return
+		}
+
+		fn(ctx)
+	}
+}
+
 //New initializes and returns a task of the specified action
+//This should be the only way new tasks are launched
 func New(action string) Task {
 	tasksMu.RLock()
 	defer tasksMu.RUnlock()
@@ -54,11 +103,29 @@ func New(action string) Task {
 	if !ok {
 		panic("No such task: " + action)
 	}
-	return fn()
+	t := fn()
+
+	//TODO How to do multiple type assertions?
+
+	// Specialized task types
+	// if w, ok := t.(Worker); ok {
+	// 	log.Logger.Info("worker")
+	// 	logger := log.Logger.WithField("task", action)
+	// 	w.SetLogger(logger)
+	// 	// Worker wraps the Execute function
+	// 	t = logMiddleware(t.Execute)
+	// }
+
+	if c, ok := t.(Configurable); ok {
+		log.Logger.Info("configable")
+		t = configMiddleware(t.Execute, c)
+	}
+
+	return t
 }
 
 //Run runs a task immediately, out of sequence
-func Run(c client.Client, action string, vars map[string]interface{}) error {
+func Run(ctx context.Context, action string) {
 	t := New(action)
-	return t.Execute(c, vars)
+	t.Execute(ctx)
 }

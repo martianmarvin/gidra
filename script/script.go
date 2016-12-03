@@ -1,10 +1,19 @@
 package script
 
-import "github.com/martianmarvin/vars"
-
-var (
-	DefaultThreads = 100
+import (
+	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/log"
+	"github.com/martianmarvin/vars"
 )
+
+// Context key
+type key int
+
+const (
+	ctxVars key = iota
+)
+
+var Logger = log.Logger
 
 //Script is the runner that executes Sequences
 // Unlike a Sequence or Task, a Script is fully concurrency-safe and executes
@@ -44,7 +53,7 @@ func NewScript() *Script {
 
 //Load loads a config file and initializes Sequences
 func (s *Script) Load(name string) (err error) {
-	vars := make(map[string]interface{})
+	params := make(map[string]interface{})
 
 	cfg, err := parseConfig(name)
 	if err != nil {
@@ -53,7 +62,7 @@ func (s *Script) Load(name string) (err error) {
 
 	//TODO get loop from number of input lines if not explicitly defined
 	s.Loop = cfg.UInt(cfgConfigLoop, 1)
-	s.Threads = cfg.UInt(cfgConfigThreads, DefaultThreads)
+	s.Threads = cfg.UInt(cfgConfigThreads, config.Threads)
 
 	s.BeforeSequence, err = parseSequence(cfgSeqBefore, cfg)
 	if err == nil {
@@ -68,7 +77,7 @@ func (s *Script) Load(name string) (err error) {
 
 	//TODO construct vars from input for each sequence
 	for i := 0; i <= s.Loop; i++ {
-		ivars := parseInputVars(vars)
+		ivars := parseInputVars(params)
 		seq, err := s.Sequence.Clone()
 		if err != nil {
 			return err

@@ -10,19 +10,10 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-const (
-	// Tag on config struct
-	configTag = "task"
-	//Separator between tag fields
-	tagSeparator = ","
-)
-
 // BaseTask includes fields common to all tasks
 type BaseTask struct {
 	//Id is the number of this task in the sequence
 	Id int
-	//Vars are all of the variables available to this task
-	Vars map[string]string
 }
 
 // Try to parse interface to int
@@ -54,30 +45,6 @@ func parseStringMap(vars map[string]interface{}) map[string]string {
 	return res
 }
 
-//Parse field tag
-func parseFieldTag(tag string) (name string, flags ConfigFlag) {
-	if len(tag) == 0 {
-		return
-	}
-
-	fieldTags := strings.Split(tag, tagSeparator)
-	for _, ft := range fieldTags {
-		switch ft {
-		case "-":
-			flags.Set(FieldSkip)
-		case "required":
-			flags.Set(FieldRequired)
-		case "omitempty":
-			flags.Set(FieldOmitEmpty)
-		default:
-			if len(name) == 0 {
-				name = ft
-			}
-		}
-	}
-	return name, flags
-}
-
 //checks all required params are present in the config struct
 func validateConfig(config interface{}, vars map[string]interface{}) (err error) {
 	cfg := structs.New(config)
@@ -101,6 +68,7 @@ func validateConfig(config interface{}, vars map[string]interface{}) (err error)
 }
 
 //Configure parses input vars into this task's Config and Vars
+//TODO refactor to use type assertions instead of reflection
 func Configure(t Task, vars map[string]interface{}) (err error) {
 	tsk := structs.New(t)
 

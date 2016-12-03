@@ -1,9 +1,9 @@
 package script
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/vars"
 )
@@ -25,8 +25,8 @@ type Sequence struct {
 	//Sequence-global variables/config, set per iteration
 	Vars *vars.Vars
 
-	//Client shared by all requests in this sequence
-	Client client.Client
+	//Context shared by all requests in this sequence
+	ctx context.Context
 }
 
 func NewSequence() *Sequence {
@@ -34,10 +34,16 @@ func NewSequence() *Sequence {
 		Tasks:      make([]task.Task, 0),
 		errors:     make([]error, 0),
 		conditions: make([][]Condition, 0),
+		context:    defaultContext(),
 		Vars:       vars.New(),
 	}
 
 	return s
+}
+
+func defaultContext() context.Context {
+	ctx := context.Background()
+	return ctx
 }
 
 //Success indicates whether the sequence completed successfully

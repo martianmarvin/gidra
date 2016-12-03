@@ -3,6 +3,7 @@ package http
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"net"
 	"net/url"
 	"time"
@@ -13,7 +14,25 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-type FastHTTPClient struct {
+// Context key
+type key int
+
+const (
+	ctxClient key = iota
+)
+
+// Attaches an http client to this context
+func WithContext(ctx context.Context, c *Client) context.Context {
+	return context.WithValue(ctx, ctxClient, c)
+}
+
+// Returns the client attached to this context
+func FromContext(ctx context.Context) (*Client, bool) {
+	c, ok := ctx.Value(ctxClient).(*Client)
+	return c, ok
+}
+
+type Client struct {
 	//The underlying fasthttp.Client instance
 	client *fasthttp.Client
 
@@ -35,8 +54,8 @@ type FastHTTPClient struct {
 	Responses []*fasthttp.Response
 }
 
-func NewHTTPClient() *FastHTTPClient {
-	c := &FastHTTPClient{
+func NewClient() *Client {
+	c := &Client{
 		client:          &fasthttp.Client{},
 		dialer:          conn.NewDialer(),
 		Jar:             fastcookiejar.New(),
@@ -48,12 +67,12 @@ func NewHTTPClient() *FastHTTPClient {
 	return c
 }
 
-func (c *FastHTTPClient) Dial(addr string, proxy *url.URL) (net.Conn, error) {
+func (c *Client) Dial(addr string, proxy *url.URL) (net.Conn, error) {
 	return c.dialer.Dial(addr, proxy)
 }
 
 //Close closes the underlying connection and releases all responses
-func (c *FastHTTPClient) Close() error {
+func (c *Client) Close() error {
 	var err error
 	for _, resp := range c.Responses {
 		fasthttp.ReleaseResponse(resp)
@@ -62,7 +81,7 @@ func (c *FastHTTPClient) Close() error {
 }
 
 // Apply client's headers and cookies to request
-func (c *FastHTTPClient) buildRequest(req *fasthttp.Request) *fasthttp.Request {
+func (c *Client) buildRequest(req *fasthttp.Request) *fasthttp.Request {
 	//Apply global client headers if not in request
 	for k, v := range c.Headers {
 		if len(req.Header.Peek(k)) == 0 {
@@ -89,7 +108,7 @@ func getRedirectURL(baseURL string, location []byte) string {
 
 //Do executes the request, applying all client-global options and returns the
 //response
-func (c *FastHTTPClient) Do(req *fasthttp.Request, proxy *url.URL) error {
+func (c *Client) Do(req *fasthttp.Request, proxy *url.URL) error {
 	var err error
 
 	c.dialer.Proxy = proxy
@@ -144,7 +163,7 @@ func parseResponse(resp *fasthttp.Response) []byte {
 //Response returns the response for this client's most recent request, or nil
 //if the most recent request had an error
 //The response is released after being read and should not be accessed again
-func (c *FastHTTPClient) Response() []byte {
+func (c *Client) Response() []byte {
 	var text []byte
 	n := len(c.Responses)
 	if n == 0 {
