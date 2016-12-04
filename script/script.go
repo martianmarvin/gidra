@@ -13,7 +13,7 @@ const (
 	ctxVars key = iota
 )
 
-var Logger = log.Logger
+var Logger = log.Logger()
 
 //Script is the runner that executes Sequences
 // Unlike a Sequence or Task, a Script is fully concurrency-safe and executes

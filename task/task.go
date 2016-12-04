@@ -6,8 +6,6 @@ import (
 	"errors"
 	"sort"
 	"sync"
-
-	"github.com/martianmarvin/gidra/log"
 )
 
 // Context key
@@ -80,7 +78,7 @@ func New(action string) Task {
 	t := fn()
 
 	//wrap for middleware
-	t = &task{task: t, name: action, logger: log.Logger.WithField("task", action)}
+	t = &task{task: t, name: action}
 
 	return t
 }

@@ -4,8 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Sirupsen/logrus"
-
+	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/vars"
 )
 
@@ -13,11 +12,13 @@ import (
 type task struct {
 	task   Task
 	name   string
-	logger logrus.FieldLogger
+	logger log.Log
 }
 
 func (t *task) Execute(ctx context.Context) error {
 	var err error
+
+	ctx = log.WithContext(ctx, t.logger)
 
 	if l, ok := t.task.(Loggable); ok {
 		l.SetLogger(t.logger)
