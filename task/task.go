@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/martianmarvin/gidra/log"
-	"github.com/martianmarvin/vars"
 )
 
 // Context key
@@ -31,13 +30,13 @@ var (
 // Task is a single step in a Script
 type Task interface {
 	// Execute executes the task and returns an error if it did not complete
-	Execute(ctx context.Context)
+	Execute(ctx context.Context) error
 }
 
 type newTaskFunc func() Task
 
 // ExecFunc executes a task with the given context
-type ExecFunc func(ctx context.Context)
+type ExecFunc func(ctx context.Context) error
 
 // ExecFunc also satisfies the Task inteface
 func (f ExecFunc) Execute(ctx context.Context) {
@@ -69,31 +68,6 @@ func Tasks() []string {
 	return list
 }
 
-func logMiddleware(fn ExecFunc) ExecFunc {
-	return func(ctx context.Context) {
-		log.Logger.Info("Before")
-		fn(ctx)
-		log.Logger.Info("After")
-	}
-}
-
-func configMiddleware(fn ExecFunc, c Configurable) ExecFunc {
-	return func(ctx context.Context) {
-		taskVars, ok := vars.FromContext(ctx)
-		if !ok {
-			err := errors.New("No vars found on context")
-			log.Logger.Error(err)
-			return
-		}
-		if err := c.Configure(taskVars); err != nil {
-			log.Logger.Error(err)
-			return
-		}
-
-		fn(ctx)
-	}
-}
-
 //New initializes and returns a task of the specified action
 //This should be the only way new tasks are launched
 func New(action string) Task {
@@ -105,21 +79,8 @@ func New(action string) Task {
 	}
 	t := fn()
 
-	//TODO How to do multiple type assertions?
-
-	// Specialized task types
-	// if w, ok := t.(Worker); ok {
-	// 	log.Logger.Info("worker")
-	// 	logger := log.Logger.WithField("task", action)
-	// 	w.SetLogger(logger)
-	// 	// Worker wraps the Execute function
-	// 	t = logMiddleware(t.Execute)
-	// }
-
-	if c, ok := t.(Configurable); ok {
-		log.Logger.Info("configable")
-		t = configMiddleware(t.Execute, c)
-	}
+	//wrap for middleware
+	t = &task{task: t, name: action, logger: log.Logger.WithField("task", action)}
 
 	return t
 }

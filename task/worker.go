@@ -1,8 +1,6 @@
 package task
 
 import (
-	"context"
-
 	"github.com/martianmarvin/gidra/log"
 
 	"github.com/Sirupsen/logrus"
@@ -20,17 +18,22 @@ type worker struct {
 	requiredVars []string
 }
 
-// Worker is the basic Task type that most tasks should include. It
-// encapsulates standard methods shared by most tasks
-type Worker interface {
-	// Id returns the number of this task in the sequence
-	Id() int
-
+// A Loggable task is able to log its own logger
+type Loggable interface {
 	// Logger returns this task's logger
 	Logger() logrus.FieldLogger
 
 	// SetLogger attaches a logger to this task
 	SetLogger(logrus.FieldLogger)
+}
+
+// Worker is the basic Task type that most tasks should include. It
+// encapsulates standard methods shared by most tasks
+type Worker interface {
+	Loggable
+
+	// Id returns the number of this task in the sequence
+	Id() int
 
 	// Vars give access to this worker's local vars
 	Vars() *vars.Vars
@@ -42,13 +45,6 @@ func NewWorker() Worker {
 		logger:       log.Logger,
 		taskVars:     vars.New(),
 		requiredVars: make([]string, 0),
-	}
-}
-
-// Execute wraps the other task's Execute function
-func (w *worker) execute(fn ExecFunc) ExecFunc {
-	return func(ctx context.Context) {
-		fn(ctx)
 	}
 }
 

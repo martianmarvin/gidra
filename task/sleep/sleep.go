@@ -37,8 +37,9 @@ func NewTask() task.Task {
 
 }
 
-func (t *Task) Execute(ctx context.Context) {
+func (t *Task) Execute(ctx context.Context) error {
 	t.Config.Duration *= time.Second
 	t.Logger().WithField("seconds", t.Config.Duration).Info("Sleeping...")
 	time.Sleep(t.Config.Duration)
+	return nil
 }
