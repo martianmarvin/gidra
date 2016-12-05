@@ -32,9 +32,7 @@ func NewTask() task.Task {
 		Worker: task.NewWorker(),
 	}
 	t.Configurable = task.NewConfigurable(t.Config)
-
 	return t
-
 }
 
 func (t *Task) Execute(ctx context.Context) error {

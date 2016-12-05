@@ -2,6 +2,7 @@ package extract
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"regexp"
 
@@ -22,7 +23,8 @@ func init() {
 }
 
 type Task struct {
-	task.BaseTask
+	task.Worker
+	task.Configurable
 
 	Config *Config
 }
@@ -39,10 +41,12 @@ type Config struct {
 }
 
 func NewTask() task.Task {
-	return &Task{
-		BaseTask: task.BaseTask{},
-		Config:   &Config{},
+	t := &Task{
+		Config: &Config{},
+		Worker: task.NewWorker(),
 	}
+	t.Configurable = task.NewConfigurable(t.Config)
+	return t
 }
 
 //Return the compiled matcher for this string key
@@ -114,13 +118,9 @@ func extractByElement(matcher cascadia.Selector, text []byte) []string {
 }
 
 // Execute extracts specified text
-func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err error) {
+func (t *Task) Execute(ctx context.Context) (err error) {
 	var results []string
 	var rk string
-
-	if err = task.Configure(t, vars); err != nil {
-		return err
-	}
 
 	if len(t.Config.Key) > 0 {
 		rk = t.Config.Key

@@ -9,10 +9,11 @@ import (
 )
 
 func TestSleep(t *testing.T) {
-	params := make(map[string]interface{})
-	params["seconds"] = 5
 	tsk := task.New("sleep")
-	ctx := vars.WithContext(context.Background(), vars.New())
-	ctx = vars.WithVar(ctx, "seconds", 5)
-	tsk.Execute(ctx)
+	ctx := vars.ToContext(context.Background(), vars.New())
+	ctx = vars.SetCtx(ctx, "seconds", 5)
+	err := tsk.Execute(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

@@ -1,10 +1,10 @@
 package http
 
 import (
+	"context"
 	"errors"
-	"net/url"
 
-	"github.com/martianmarvin/gidra/client"
+	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/valyala/fasthttp"
 )
@@ -14,7 +14,8 @@ var (
 )
 
 type Task struct {
-	task.BaseTask
+	task.Worker
+	task.Configurable
 
 	Config *Config
 }
@@ -24,8 +25,6 @@ type Config struct {
 
 	URL string `task:"url,required"`
 
-	Proxy *url.URL
-
 	Headers map[string]string
 
 	Cookies map[string]string
@@ -33,28 +32,19 @@ type Config struct {
 	Params map[string]string
 
 	Body []byte
-
-	Client client.HTTPClient
 }
 
-func (t *Task) Execute(c client.Client, vars map[string]interface{}) (err error) {
-	if _, ok := vars["method"]; !ok {
-		vars["method"] = t.Config.Method
-	}
-	if err = task.Configure(t, vars); err != nil {
-		return err
-	}
-	//TODO idiomatic Dialer instead of proxy
-	req := t.buildRequest()
+func (t *Task) Execute(ctx context.Context) (err error) {
 
-	httpclient, ok := c.(client.HTTPClient)
+	// Get client from the context
+	c, ok := httpclient.FromContext(ctx)
 	if !ok {
 		return ErrBadClient
 	}
 
-	t.Config.Client = httpclient
+	req := t.buildRequest()
 
-	err = httpclient.Do(req, t.Config.Proxy)
+	err = c.Do(req)
 
 	return err
 }

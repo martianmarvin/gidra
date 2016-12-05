@@ -41,7 +41,7 @@ func (f ExecFunc) Execute(ctx context.Context) {
 	f(ctx)
 }
 
-//Register registers a new type of task, making it available to scripts
+// Register registers a new type of task, making it available to scripts
 func Register(action string, fn newTaskFunc) {
 	tasksMu.Lock()
 	defer tasksMu.Unlock()
@@ -54,7 +54,7 @@ func Register(action string, fn newTaskFunc) {
 	registeredTasks[action] = fn
 }
 
-//Tasks returns a sorted list of all available task types
+// Tasks returns a sorted list of all available task types
 func Tasks() []string {
 	tasksMu.RLock()
 	defer tasksMu.RUnlock()
@@ -66,8 +66,8 @@ func Tasks() []string {
 	return list
 }
 
-//New initializes and returns a task of the specified action
-//This should be the only way new tasks are launched
+// New initializes and returns a task of the specified action
+// This should be the only way new tasks are launched
 func New(action string) Task {
 	tasksMu.RLock()
 	defer tasksMu.RUnlock()
@@ -83,8 +83,13 @@ func New(action string) Task {
 	return t
 }
 
-//Run runs a task immediately, out of sequence
-func Run(ctx context.Context, action string) {
+// Run runs a task immediately, out of sequence
+func Run(ctx context.Context, action string) error {
 	t := New(action)
-	t.Execute(ctx)
+	return t.Execute(ctx)
+}
+
+// Execute runs the given task in a new context
+func Execute(t Task) error {
+	return t.Execute(context.Background())
 }

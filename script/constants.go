@@ -1,22 +1,4 @@
-package script
-
-// Dot-separated paths to specific config values
-var (
-	// Global config
-	cfgConfig        = "config"
-	cfgConfigLoop    = cfgConfig + ".loop"
-	cfgConfigThreads = cfgConfig + ".threads"
-
-	//Global variablies
-	cfgVars = "vars"
-
-	//HTTP Variables
-	cfgDefault          = "default"
-	cfgDefaultRedirects = cfgDefault + ".follow_redirects"
-	cfgDefaultHeaders   = cfgDefault + ".headers"
-	cfgDefaultTimeout   = cfgDefault + ".timeout"
-
-	//Sequences
+//Sequences
 	cfgSeqBefore = "before"
 	cfgSeqTasks  = "tasks"
 	cfgSeqAfter  = "finally"

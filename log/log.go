@@ -11,15 +11,23 @@ import (
 // The default global log
 var logger *logrus.Entry
 
+var (
+	// Default global log level
+	defaultLevel = logrus.DebugLevel
+
+	// Config key that has log level
+	cfgLogLevel = "verbosity"
+)
+
 type Log interface {
 	logrus.FieldLogger
 }
 
 // Context key
-type key int
+type contextKey int
 
 const (
-	ctxLogger key = iota
+	ctxLogger contextKey = iota
 )
 
 func init() {
@@ -29,7 +37,12 @@ func init() {
 func initLogger() {
 	logrus.SetOutput(os.Stderr)
 	logger = logrus.WithField("task", "gidra")
-	logger.Level = config.Verbosity
+}
+
+func setLevel(lvl logrus.Level) {
+	if lvl > 0 && lvl <= 5 {
+		logrus.SetLevel(lvl)
+	}
 }
 
 // Logger returns the default global logger
@@ -37,13 +50,19 @@ func Logger() Log {
 	return logger
 }
 
-// WithContext attaches the given logger to this context
-func WithContext(ctx context.Context, logger Log) context.Context {
+// ToContext attaches the given logger to this context
+func ToContext(ctx context.Context, logger Log) context.Context {
 	return context.WithValue(ctx, ctxLogger, logger)
 }
 
 // FromContext returns the logger attached to this context
-func FromContext(ctx context.Context) (Log, bool) {
+func FromContext(ctx context.Context) Log {
 	l, ok := ctx.Value(ctxLogger).(Log)
-	return l, ok
+	if !ok {
+		l = Logger()
+	}
+	// Set verbosity from config
+	cfg := config.FromContext(ctx)
+	logrus.SetLevel(logrus.Level(cfg.UInt(cfgLogLevel, int(defaultLevel))))
+	return l
 }
