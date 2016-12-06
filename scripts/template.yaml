@@ -41,7 +41,7 @@ tasks:
       regex: 'csrf_token="(.*)"'
       as: csrf_token
   - post:
-      url: '{{ Vars.host }}/login'
+      url: '{{ .Vars.host }}/login'
       headers:
         referer: http://www.example.com
       params:

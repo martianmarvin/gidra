@@ -1,4 +1,16 @@
-//Sequences
+package script
+
+// Dot-separated paths to specific config values
+var (
+	// Global config
+	cfgConfig        = "config"
+	cfgConfigLoop    = cfgConfig + ".loop"
+	cfgConfigThreads = cfgConfig + ".threads"
+
+	//Global variablies
+	cfgVars = "vars"
+
+	//Sequences
 	cfgSeqBefore = "before"
 	cfgSeqTasks  = "tasks"
 	cfgSeqAfter  = "finally"

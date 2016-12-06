@@ -3,20 +3,27 @@ package script
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"strings"
 
-	gidraconfig "github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/vars"
-	"github.com/olebedev/config"
 )
 
-// Reads a config yaml file
-func parseConfig(siteName string) (cfg *config.Config, err error) {
-	fn := siteName + ".yaml"
-	fp := filepath.Join(gidraconfig.ScriptDir, fn)
+// Reads a script yaml file
+func parseScript(name string) (cfg *config.Config, err error) {
+	if !strings.HasSuffix(name, ".yaml") {
+		name = filepath.Join(config.ScriptDir, name+".yaml")
+	}
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-	cfg, err = config.ParseYamlFile(fp)
+	cfg, err = config.ParseYaml(f)
 
 	return cfg, err
 }
@@ -67,8 +74,6 @@ func parseTask(key string, cfg *config.Config) (task.Task, error) {
 
 	//Panics if task not found
 	tsk := task.New(taskName)
-
-	err = task.Configure(tsk, taskVars)
 
 	return tsk, err
 }

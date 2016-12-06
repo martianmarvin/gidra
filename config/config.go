@@ -3,8 +3,10 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/olebedev/config"
@@ -127,12 +129,20 @@ func (cfg *Config) UStringList(path string, defaults ...[]string) []string {
 var cfg *Config
 
 // ParseYAML creates a new config from a yaml file
-func ParseYaml(text string) (*Config, error) {
+func ParseYaml(r io.Reader) (*Config, error) {
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(r)
+	if err != nil {
+		return nil, err
+	}
+	text := buf.String()
+
 	formatted := strings.Replace(strings.TrimSpace(text), "\t", "    ", -1)
 	c, err := config.ParseYaml(formatted)
 	if err != nil {
 		return nil, err
 	}
+
 	cfg := New()
 	cfg.Config = c
 	return cfg, nil
@@ -147,7 +157,8 @@ func Must(cfg *Config, err error) *Config {
 }
 
 func init() {
-	cfg = Must(ParseYaml(defaultConfig))
+	r := strings.NewReader(defaultConfig)
+	cfg = Must(ParseYaml(r))
 }
 
 // Global settings not used inside tasks, therefore not subject to config file

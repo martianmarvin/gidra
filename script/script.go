@@ -1,16 +1,9 @@
 package script
 
 import (
-	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/log"
+	"github.com/martianmarvin/gidra/sequence"
 	"github.com/martianmarvin/vars"
-)
-
-// Context key
-type key int
-
-const (
-	ctxVars key = iota
 )
 
 var Logger = log.Logger()
@@ -19,8 +12,6 @@ var Logger = log.Logger()
 // Unlike a Sequence or Task, a Script is fully concurrency-safe and executes
 // multiple Sequences concurrently
 type Script struct {
-	status int
-
 	//How many times the script should loop total
 	Loop int
 
@@ -34,35 +25,35 @@ type Script struct {
 	Vars *vars.Vars
 
 	//Sequence represents the main task sequence in this script
-	Sequence *Sequence
+	Sequence *sequence.Sequence
 
 	//BeforeSequence is the sequence to run before running the main one
-	BeforeSequence *Sequence
+	BeforeSequence *sequence.Sequence
 
 	//AfterSequence is the sequence to run before running the main one
-	AfterSequence *Sequence
+	AfterSequence *sequence.Sequence
 }
 
 //NewScript loads and parses config YAML
-func NewScript() *Script {
+func New() *Script {
 	return &Script{
 		queue: make(chan *Sequence, 1),
 		Vars:  vars.New(),
 	}
 }
 
-//Load loads a config file and initializes Sequences
+//Load loads a script file and initializes Sequences
 func (s *Script) Load(name string) (err error) {
 	params := make(map[string]interface{})
 
-	cfg, err := parseConfig(name)
+	cfg, err := parseScript(name)
 	if err != nil {
 		return
 	}
 
 	//TODO get loop from number of input lines if not explicitly defined
 	s.Loop = cfg.UInt(cfgConfigLoop, 1)
-	s.Threads = cfg.UInt(cfgConfigThreads, config.Threads)
+	s.Threads, _ = cfg.Int(cfgConfigThreads)
 
 	s.BeforeSequence, err = parseSequence(cfgSeqBefore, cfg)
 	if err == nil {

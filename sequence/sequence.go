@@ -1,4 +1,4 @@
-package script
+package sequence
 
 import (
 	"context"
@@ -22,28 +22,47 @@ type Sequence struct {
 	//List of conditions corresponding to tasks in the sequence
 	conditions [][]Condition
 
-	//Sequence-global variables/config, set per iteration
-	Vars *vars.Vars
-
 	//Context shared by all requests in this sequence
 	ctx context.Context
 }
 
-func NewSequence() *Sequence {
+func New() *Sequence {
 	s := &Sequence{
 		Tasks:      make([]task.Task, 0),
 		errors:     make([]error, 0),
 		conditions: make([][]Condition, 0),
-		context:    defaultContext(),
-		Vars:       vars.New(),
+		ctx:        defaultContext(),
 	}
 
 	return s
 }
 
+// Initialize default context objects
 func defaultContext() context.Context {
 	ctx := context.Background()
+	ctx = vars.ToContext(ctx, vars.New())
 	return ctx
+}
+
+// Context returns this sequence's context
+func (s *Sequence) Context() context.Context {
+	if s.ctx != nil {
+		return s.ctx
+	}
+	return defaultContext()
+}
+
+// WithContext returns a shallow copy of the Sequence with the new context
+func (s *Sequence) WithContext(ctx context.Context) *Sequence {
+	s2 := New()
+	*s2 = *s
+
+	seqVars := vars.FromContext(ctx)
+	ctx = vars.ToContext(ctx, seqVars)
+
+	s2.ctx = ctx
+
+	return s2
 }
 
 //Success indicates whether the sequence completed successfully
@@ -103,17 +122,17 @@ func (s *Sequence) executeStep(n int) error {
 	// Step through conditions at this step, to determine whether this
 	// task should be executed
 	tsk := s.Tasks[n]
+	seqVars := vars.FromContext(s.ctx)
 	for _, cond := range s.conditions[n] {
-		vars := s.Vars.Map()
 		for {
 			// This for loop executes inside a single condition
-			err = cond.Check(vars)
+			err = cond.Check(seqVars.Map())
 			switch err {
 			case nil:
 				// Only run the task if it has not yet run
 				if !runLatch {
 					//This must be a precondition
-					s.errors[n] = tsk.Execute(s.Client, vars)
+					s.errors[n] = tsk.Execute(s.ctx)
 					runLatch = true
 				}
 				// Regardless of whether the task was run,
@@ -129,7 +148,7 @@ func (s *Sequence) executeStep(n int) error {
 				// Run task, but stay inside this condition
 				// The condition is responsible for signaling when we
 				// should stop retrying
-				s.errors[n] = tsk.Execute(s.Client, vars)
+				s.errors[n] = tsk.Execute(s.ctx)
 				continue
 			case ErrFail:
 				return err
@@ -154,37 +173,11 @@ func (s *Sequence) Execute() []error {
 	return s.errors
 }
 
-//Clone creates a deep copy of this sequence
-func (s *Sequence) Clone() (*Sequence, error) {
-	var err error
-	seq := &Sequence{
-		Tasks:      make([]task.Task, len(s.Tasks)),
-		n:          s.n,
-		errors:     make([]error, len(s.errors)),
-		conditions: make([][]Condition, len(s.conditions)),
-		Client:     s.Client,
-	}
-
-	seq.Vars, err = s.Vars.Clone()
-	if err != nil {
-		return nil, err
-	}
-
-	copy(seq.Tasks, s.Tasks)
-	copy(seq.errors, s.errors)
-
-	for i, conds := range s.conditions {
-		seq.conditions[i] = make([]Condition, len(conds))
-		copy(seq.conditions[i], conds)
-	}
-
-	return seq, err
-}
-
 // Configure merges each map of variables, and applies them to this sequence
 // This method is safe to use concurrently from multiple goroutines
-func (s *Sequence) Configure(vars ...*vars.Vars) {
-	for _, v := range vars {
-		s.Vars.Extend(v)
+func (s *Sequence) Configure(nvars ...*vars.Vars) {
+	seqVars := vars.FromContext(s.ctx)
+	for _, v := range nvars {
+		seqVars.Extend(v)
 	}
 }
