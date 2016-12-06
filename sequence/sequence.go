@@ -10,29 +10,35 @@ import (
 
 // Sequence is a series of tasks that represent a single iteration of the loop
 type Sequence struct {
+	// The number of the current loop iteration
+	Id int
+
 	//Tasks is the list of tasks in this sequence
 	Tasks []task.Task
 
 	//The sequence id of the current task
 	n int
 
-	//List of errors from tasks(not including retries)
-	errors []error
-
 	//List of conditions corresponding to tasks in the sequence
 	conditions [][]Condition
 
+	//The result once the sequence has finished running
+	Result *Result
+
 	//Context shared by all requests in this sequence
 	ctx context.Context
+
+	cancel context.CancelFunc
 }
 
-func New() *Sequence {
+func New(id int) *Sequence {
 	s := &Sequence{
+		Id:         id,
 		Tasks:      make([]task.Task, 0),
-		errors:     make([]error, 0),
+		Result:     NewResult(),
 		conditions: make([][]Condition, 0),
-		ctx:        defaultContext(),
 	}
+	s.ctx, s.cancel = context.WithCancel(defaultContext())
 
 	return s
 }
@@ -54,7 +60,7 @@ func (s *Sequence) Context() context.Context {
 
 // WithContext returns a shallow copy of the Sequence with the new context
 func (s *Sequence) WithContext(ctx context.Context) *Sequence {
-	s2 := New()
+	s2 := New(s.Id + 1)
 	*s2 = *s
 
 	seqVars := vars.FromContext(ctx)
@@ -63,11 +69,6 @@ func (s *Sequence) WithContext(ctx context.Context) *Sequence {
 	s2.ctx = ctx
 
 	return s2
-}
-
-//Success indicates whether the sequence completed successfully
-func (s *Sequence) Success() bool {
-	return s.Completed() && (s.ErrCount() == 0)
 }
 
 //Completed indicates whether the sequence is done or still has more tasks to do successfully
@@ -170,6 +171,7 @@ func (s *Sequence) Execute() []error {
 			break
 		}
 	}
+	s.cancel()
 	return s.errors
 }
 

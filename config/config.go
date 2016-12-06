@@ -46,19 +46,22 @@ func New() *Config {
 	}
 }
 
-func (cfg *Config) Get(path string) (*Config, error) {
+// CheckGet returns the config at path, or false if it does not exist
+func (cfg *Config) CheckGet(path string) (*Config, bool) {
 	subcfg, err := cfg.Config.Get(path)
-	return &Config{Config: subcfg}, err
+	if err != nil {
+		return nil, false
+	}
+	return &Config{Config: subcfg}, true
 }
 
-// UGet returns the result of Get() or the default
-func (cfg *Config) UGet(path string, def *Config) *Config {
-	c, err := cfg.Get(path)
-	if err == nil {
-		return c
-	} else {
+// Get returns the config at path, or the default if not found
+func (cfg *Config) Get(path string, def *Config) *Config {
+	c, ok := cfg.CheckGet(path)
+	if !ok {
 		return def
 	}
+	return c
 }
 
 // StringMap returns a map with string values
@@ -123,6 +126,22 @@ func (cfg *Config) UStringList(path string, defaults ...[]string) []string {
 		list[j] = fmt.Sprint(v)
 	}
 	return list
+}
+
+// MapList returns a list of map[string]interface{}
+func (cfg *Config) MapList(path string) ([]map[string]interface{}, error) {
+	list := make([]map[string]interface{}, 0)
+	l, err := cfg.List(path)
+	if err != nil {
+		return nil, err
+	}
+	for i, _ := range l {
+		m, err := cfg.Map(fmt.Sprintf("%s.%d", path, i))
+		if err == nil {
+			list = append(list, m)
+		}
+	}
+	return list, nil
 }
 
 // The default top level config object

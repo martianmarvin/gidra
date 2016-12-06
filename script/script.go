@@ -1,9 +1,13 @@
 package script
 
 import (
+	"context"
+	"sync"
+
+	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/sequence"
-	"github.com/martianmarvin/vars"
 )
 
 var Logger = log.Logger()
@@ -19,48 +23,51 @@ type Script struct {
 	Threads int
 
 	// The queue of sequences to execute
-	queue chan *Sequence
+	queue chan *sequence.Sequence
 
-	// Script-global variables applied to all sequences
-	Vars *vars.Vars
+	// Datasources to read from
+	input map[string]datasource.ReadableTable
 
-	//Sequence represents the main task sequence in this script
-	Sequence *sequence.Sequence
-
-	//BeforeSequence is the sequence to run before running the main one
-	BeforeSequence *sequence.Sequence
-
-	//AfterSequence is the sequence to run before running the main one
-	AfterSequence *sequence.Sequence
+	output *datasource.WriteCloser
 }
 
-//NewScript loads and parses config YAML
+// New initializes a new Script
 func New() *Script {
 	return &Script{
 		queue: make(chan *Sequence, 1),
-		Vars:  vars.New(),
 	}
 }
 
-//Load loads a script file and initializes Sequences
-func (s *Script) Load(name string) (err error) {
-	params := make(map[string]interface{})
-
+// Open reads a script file and Loads it into a script instance
+func Open(name string) (*Script, error) {
 	cfg, err := parseScript(name)
 	if err != nil {
-		return
+		return nil, err
 	}
+	s := New()
+	err = s.Load(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
 
-	//TODO get loop from number of input lines if not explicitly defined
-	s.Loop = cfg.UInt(cfgConfigLoop, 1)
+// Load loads a script file and initializes Sequences
+// Once Load has been called on the script, no new sequences can be added, and
+// it should not be called again.
+func (s *Script) Load(cfg *config.Config) (err error) {
+	ctx := context.Background()
+
+	seqVars := parseVars(cfg)
+
 	s.Threads, _ = cfg.Int(cfgConfigThreads)
 
-	s.BeforeSequence, err = parseSequence(cfgSeqBefore, cfg)
+	beforeSequence, err = parseSequence(cfgSeqBefore, cfg)
 	if err == nil {
-		s.Add(s.BeforeSequence)
+		s.Add(beforeSequence)
 	}
 
-	s.Sequence, err = parseSequence(cfgSeqTasks, cfg)
+	mainSequence, err = parseSequence(cfgSeqTasks, cfg)
 	if err != nil {
 		// Main sequence is required
 		return err
@@ -77,11 +84,13 @@ func (s *Script) Load(name string) (err error) {
 		s.Add(seq)
 	}
 
-	s.AfterSequence, err = parseSequence(cfgSeqAfter, cfg)
+	afterSequence, err = parseSequence(cfgSeqAfter, cfg)
 	if err == nil {
 		s.AfterSequence.Configure(s.Vars)
 		s.Add(s.AfterSequence)
 	}
+
+	close(s.queue)
 
 	return err
 }
@@ -91,4 +100,41 @@ func (s *Script) Add(seq *Sequence) {
 	go func() {
 		s.queue <- seq
 	}()
+}
+
+// Run runs all of the script's sequences
+func (s *Script) Run() {
+	var wg sync.WaitGroup
+	results := make(chan *sequence.Result)
+	go resultProcessor(results)
+
+	Logger.Info("Starting Workers")
+	for i := 0; i < s.Threads; i++ {
+		wg.Add(1)
+		go runner(s.queue, results, &wg)
+	}
+	go func() {
+		wg.Wait()
+		Logger.Info("All Workers Done")
+		close(results)
+	}()
+}
+
+// Goroutine worker that runs sequences and returns results
+func runner(queue <-chan *sequence.Sequence, results chan<- *sequence.Result, wg *sync.WaitGroup) {
+	for seq := range queue {
+		results <- seq.Execute()
+	}
+	wg.Done()
+}
+
+// Goroutine that receives results and processes them with OutputFunc
+func resultProcessor(results <-chan *sequence.Result, output datasource.WriteableTable, filters ...datasource.FilterFunc) {
+	for res := range results {
+		if err := res.Err(); err != nil {
+			Logger.Error(err)
+			continue
+		}
+
+	}
 }

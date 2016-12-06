@@ -75,8 +75,8 @@ func New() *Client {
 // Configure applies settings from the config to this client
 func (c *Client) Configure(cfg *config.Config) error {
 	var err error
-	cfg, err = cfg.Get(cfgRoot)
-	if err != nil {
+	cfg, ok := cfg.CheckGet(cfgRoot)
+	if !ok {
 		return ErrNoConfig
 	}
 

@@ -4,8 +4,8 @@ package script
 var (
 	// Global config
 	cfgConfig        = "config"
-	cfgConfigLoop    = cfgConfig + ".loop"
-	cfgConfigThreads = cfgConfig + ".threads"
+	cfgLoop          = "loop"
+	cfgConfigThreads = "threads"
 
 	//Global variablies
 	cfgVars = "vars"

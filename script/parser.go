@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/sequence"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/vars"
 )
@@ -29,7 +30,7 @@ func parseScript(name string) (cfg *config.Config, err error) {
 }
 
 // Reads a Sequence from a config object
-func parseSequence(key string, cfg *config.Config) (seq *Sequence, err error) {
+func parseSequence(key string, cfg *config.Config) (seq *sequence.Sequence, err error) {
 	tasksList, err := cfg.List(key)
 	if err != nil {
 		return nil, err
