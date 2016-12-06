@@ -60,16 +60,19 @@ func fromFile(fp, format string) (ReadableTable, error) {
 
 // FromFile returns a reader reading from the specified file
 func FromFile(fp string) (ReadableTable, error) {
-	ext := path.Ext(fp)
-	if len(ext) == 0 {
-		return nil, ErrUnsupportedType
-	}
-	return fromFile(fp, ext)
+	return FromFileType(fp, "")
 }
 
 // FromFileType returns a reader that can read the specified format. The
 // format can be a file extension or a MIME type
 func FromFileType(fp string, format string) (ReadableTable, error) {
+	if len(format) == 0 {
+		ext := path.Ext(fp)
+		if len(ext) == 0 {
+			return nil, ErrUnsupportedType
+		}
+		return fromFile(fp, ext)
+	}
 	return fromFile(fp, format)
 }
 
