@@ -28,7 +28,7 @@ func testReq(t *testing.T, tsk task.Task, params map[string]interface{}) {
 	resp := client.Response()
 	assert.NotEmpty(t, resp)
 
-	t.Log(resp)
+	// t.Log(string(resp))
 }
 
 func TestGet(t *testing.T) {

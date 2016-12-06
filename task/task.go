@@ -8,13 +8,6 @@ import (
 	"sync"
 )
 
-// Context key
-type contextKey int
-
-const (
-	ctxClient contextKey = iota
-)
-
 var (
 	tasksMu         sync.RWMutex
 	registeredTasks = make(map[string]newTaskFunc)

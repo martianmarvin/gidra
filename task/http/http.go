@@ -21,7 +21,7 @@ type Task struct {
 }
 
 type Config struct {
-	Method []byte `task:"required"`
+	Method []byte
 
 	URL string `task:"url,required"`
 

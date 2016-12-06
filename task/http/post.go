@@ -12,6 +12,6 @@ func NewPost() task.Task {
 		Worker: task.NewWorker(),
 	}
 	t.Configurable = task.NewConfigurable(t.Config)
-	t.Config.Method = []byte("GET")
+	t.Config.Method = []byte("POST")
 	return t
 }

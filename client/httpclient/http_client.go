@@ -267,6 +267,7 @@ func parseResponse(resp *fasthttp.Response) []byte {
 	var buf bytes.Buffer
 	w := bufio.NewWriter(&buf)
 	resp.WriteTo(w)
+	w.Flush()
 	return buf.Bytes()
 }
 
