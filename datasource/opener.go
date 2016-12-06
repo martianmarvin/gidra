@@ -20,9 +20,33 @@ func mimeExts(mt string) ([]string, error) {
 	return exts, nil
 }
 
-func fromFile(fp, format string) (ReadableTable, error) {
+// ReaderFor returns a reader that supports the specified file extension or MIME
+// type
+func ReaderFor(format string) (ReadableTable, error) {
 	var err error
 	reader, err := NewReader(strings.TrimLeft(format, "."))
+	if err == nil {
+		return reader, nil
+	}
+
+	// Check mime type
+	exts, err := mimeExts(format)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ext := range exts {
+		reader, err := NewReader(strings.TrimLeft(ext, "."))
+		if err == nil {
+			return reader, nil
+		}
+	}
+	return nil, ErrUnsupportedType
+}
+
+func fromFile(fp, format string) (ReadableTable, error) {
+	var err error
+	reader, err := ReaderFor(format)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +65,12 @@ func FromFile(fp string) (ReadableTable, error) {
 		return nil, ErrUnsupportedType
 	}
 	return fromFile(fp, ext)
+}
+
+// FromFileType returns a reader that can read the specified format. The
+// format can be a file extension or a MIME type
+func FromFileType(fp string, format string) (ReadableTable, error) {
+	return fromFile(fp, format)
 }
 
 // TODO Parse content-type header and extension to determine mime type
