@@ -2,7 +2,6 @@ package task
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/martianmarvin/gidra/config"
@@ -85,9 +84,5 @@ func (t *task) Execute(ctx context.Context) error {
 }
 
 func configureTask(ctx context.Context, t Configurable) error {
-	taskVars, ok := vars.FromContext(ctx)
-	if !ok {
-		return errors.New("No vars found on context")
-	}
-	return t.Configure(taskVars)
+	return t.Configure(vars.FromContext(ctx))
 }

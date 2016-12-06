@@ -3,9 +3,17 @@
 package client
 
 import (
+	"context"
 	"net"
 
 	"github.com/valyala/fasthttp"
+)
+
+// Context key
+type contextKey int
+
+const (
+	ctxClient contextKey = iota
 )
 
 // Client is the basic client to connect to an external resource
@@ -36,4 +44,18 @@ type MailClient interface {
 	//TODO: mail Message struct
 	Search(kw string) interface{}
 	Messages() interface{}
+}
+
+// ToContext attaches a client to this context
+func ToContext(ctx context.Context, c Client) context.Context {
+	return context.WithValue(ctx, ctxClient, c)
+}
+
+// FromContext returns a client from the context
+func FromContext(ctx context.Context) (Client, bool) {
+	c, ok := ctx.Value(ctxClient).(Client)
+	if !ok {
+		return nil, false
+	}
+	return c, true
 }

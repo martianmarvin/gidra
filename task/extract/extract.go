@@ -10,6 +10,7 @@ import (
 	"github.com/andybalholm/cascadia"
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
+	"github.com/martianmarvin/vars"
 )
 
 var (
@@ -133,9 +134,12 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 		return errors.New("A regex or element selector is required to extract")
 	}
 
-	_, ok := vars[rk]
+	taskVars := vars.FromContext(ctx)
+	extracted := taskVars.Get(rk).MustStringArray()
+
+	client, ok := client.FromContext(ctx)
 	if !ok {
-		vars[rk] = make([]string, 0)
+		return errors.New("No client to extract from, make an http request first")
 	}
 
 	text := client.Response()
@@ -161,14 +165,10 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 		return err
 	}
 
-	extracted, ok := vars[rk].([]string)
-	if !ok {
-		return errors.New("Could not append result to extracted")
-	}
-
 	for _, res := range results {
 		extracted = append(extracted, res)
 	}
+	taskVars.SetPath(rk, extracted)
 
 	return err
 }
