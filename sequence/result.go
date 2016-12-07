@@ -45,8 +45,8 @@ func (r *Result) ReadContext(ctx context.Context) []string {
 
 // ReadVars populates this result's Output with the provided *vars.Vars
 // and returns a list of variables that were saved
-func (r *Result) ReadVars(*vars.Vars) []string {
-	found := make([]string)
+func (r *Result) ReadVars(taskVars *vars.Vars) []string {
+	found := make([]string, 0)
 
 	for _, key := range r.outputVars {
 		if taskVar, ok := taskVars.CheckGet(key); ok {

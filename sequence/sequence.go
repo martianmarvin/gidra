@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/vars"
 )
@@ -20,10 +21,10 @@ type Sequence struct {
 	n int
 
 	//List of conditions corresponding to tasks in the sequence
-	conditions [][]Condition
+	conditions [][]condition.Condition
 
-	//The result once the sequence has finished running
-	Result *Result
+	//The results for tasks once they have ran
+	Results []*Result
 
 	//Context shared by all requests in this sequence
 	ctx context.Context
@@ -35,8 +36,8 @@ func New(id int) *Sequence {
 	s := &Sequence{
 		Id:         id,
 		Tasks:      make([]task.Task, 0),
-		Result:     NewResult(),
-		conditions: make([][]Condition, 0),
+		Results:    make([]*Result, 0),
+		conditions: make([][]condition.Condition, 0),
 	}
 	s.ctx, s.cancel = context.WithCancel(defaultContext())
 
@@ -79,32 +80,20 @@ func (s *Sequence) Completed() bool {
 //Add adds a new task to the sequence and returns the number of tasks in the
 //sequence
 // Like all Sequence methods, this is not concurrency-safe
-func (s *Sequence) Add(task task.Task) int {
+func (s *Sequence) Add(task task.Task, conds []condition.Condition) int {
+	if len(conds) == 0 {
+		conds = condition.Default()
+	}
+
 	s.Tasks = append(s.Tasks, task)
-	s.errors = append(s.errors, nil)
-	s.conditions = append(s.conditions, defaultConditions())
+	s.Results = append(s.Results, NewResult())
+	s.conditions = append(s.conditions, conds)
 	return s.Size()
 }
 
 //Size returns the number of tasks in the sequence
 func (s *Sequence) Size() int {
 	return len(s.Tasks)
-}
-
-//ErrCount returns the number of errors encountered so far
-func (s *Sequence) ErrCount() int {
-	var n int
-	for _, err := range s.errors {
-		if err != nil {
-			n += 1
-		}
-	}
-	return n
-}
-
-//Step returns the step the sequence is on
-func (s *Sequence) Step() int {
-	return s.n
 }
 
 // Executes the specified single step/task in the sequence
