@@ -6,7 +6,7 @@ import "text/template"
 // callbacks before panicking. If any of the callbacks return an error, the
 // execution chain is halted and the script panics immediately
 // met
-// MET - callbacks, then panic
+// MET - callbacks, then return ErrAbort
 // NOT MET - nil
 
 type Abort struct {

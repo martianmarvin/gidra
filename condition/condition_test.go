@@ -48,6 +48,10 @@ func TestSuccess(t *testing.T) {
 	testCondition(t, NewSuccess(), nil, ErrFail)
 }
 
+func TestOnly(t *testing.T) {
+	testCondition(t, NewOnly(), nil, ErrSkip)
+}
+
 func TestSkip(t *testing.T) {
 	testCondition(t, NewSkip(), ErrSkip, nil)
 }

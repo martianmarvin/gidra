@@ -3,7 +3,7 @@ package condition
 import "text/template"
 
 // Fail is like Abort, except it returns ErrFail instead of
-// panicking
+// ErrAbort
 // MET - callbacks, then return ErrFail
 // NOT MET - nil
 
