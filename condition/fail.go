@@ -18,6 +18,7 @@ func NewFail(callbacks ...CallBackFunc) Condition {
 		condition: &condition{
 			tmpl: template.New("").Option("missingkey=zero"),
 			err:  ErrFail,
+			flag: After,
 		},
 		callbacks: callbacks,
 	}
@@ -26,8 +27,7 @@ func NewFail(callbacks ...CallBackFunc) Condition {
 func (c *Fail) Check(vars map[string]interface{}) error {
 	if c.isMet(vars) {
 		for _, cb := range c.callbacks {
-			err := cb()
-			if err != nil {
+			if err := cb(); err != nil {
 				break
 			}
 		}

@@ -20,6 +20,7 @@ func NewAbort(callbacks ...CallBackFunc) Condition {
 		condition: &condition{
 			tmpl: template.New("").Option("missingkey=zero"),
 			err:  ErrAbort,
+			flag: After,
 		},
 		callbacks: callbacks,
 	}
@@ -28,8 +29,7 @@ func NewAbort(callbacks ...CallBackFunc) Condition {
 func (c *Abort) Check(vars map[string]interface{}) error {
 	if c.isMet(vars) {
 		for _, cb := range c.callbacks {
-			err := cb()
-			if err != nil {
+			if err := cb(); err != nil {
 				break
 			}
 		}

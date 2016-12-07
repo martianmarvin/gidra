@@ -14,6 +14,7 @@ func NewSuccess() Condition {
 		condition: &condition{
 			tmpl: template.New("").Option("missingkey=zero"),
 			err:  ErrFail,
+			flag: After,
 		},
 	}
 }

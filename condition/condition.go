@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+
+	"github.com/martianmarvin/gidra/config"
 )
 
 var (
@@ -26,6 +28,18 @@ var (
 	ErrSkip = errors.New("Skipping task")
 
 	DefaultRetryLimit = 5
+)
+
+// Flags determining when condition should be checked
+const (
+	// Condition runs before task execution
+	Before config.Flag = 1 << iota
+
+	// Condition runs after task execution
+	After
+
+	// Condition only runs once during the entire sequence
+	Once
 )
 
 //Output a template into a string
@@ -56,6 +70,10 @@ type Condition interface {
 	// The template is concatenated with an if pipeline to coerce the result to
 	// boolean
 	Parse(cond string) error
+
+	// Flags returns the execution flags that determine how this condition
+	// should run
+	Flags() config.Flag
 }
 
 //Returns a slice containing a single condition
@@ -79,6 +97,9 @@ type condition struct {
 
 	// The type of error to return if the condition is NOT MET
 	err error
+
+	// Config flags
+	flag config.Flag
 }
 
 // New returns a new empty condition
@@ -137,4 +158,8 @@ func (c *condition) Check(vars map[string]interface{}) error {
 	} else {
 		return c.err
 	}
+}
+
+func (c *condition) Flags() config.Flag {
+	return c.flag
 }

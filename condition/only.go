@@ -16,6 +16,7 @@ func NewOnly() Condition {
 		condition: &condition{
 			tmpl: template.New("").Option("missingkey=zero"),
 			err:  ErrSkip,
+			flag: Before,
 		},
 	}
 }
