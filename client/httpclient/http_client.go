@@ -56,6 +56,9 @@ type Client struct {
 
 	//All responses from requests made by this client
 	responses []*fasthttp.Response
+
+	// page is the most recent page requested by this client
+	page *Page
 }
 
 // New initializes an HTTP client with default settings
@@ -159,6 +162,10 @@ func (c *Client) Do(req *fasthttp.Request) error {
 	resp := fasthttp.AcquireResponse()
 
 	//follow redirects, saving cookies along the way
+	requrl := req.URI().String()
+	redirects := make([]string, 0)
+	redirects = append(redirects, requrl)
+
 	for {
 		err = c.client.DoTimeout(req, resp, c.timeout)
 		if err != nil {
@@ -176,8 +183,9 @@ func (c *Client) Do(req *fasthttp.Request) error {
 		if len(location) == 0 {
 			break
 		}
-		newurl := getRedirectURL(req.URI().String(), location)
-		req.SetRequestURI(newurl)
+		requrl = getRedirectURL(requrl, location)
+		redirects = append(redirects, requrl)
+		req.SetRequestURI(requrl)
 	}
 
 	fasthttp.ReleaseRequest(req)
@@ -186,35 +194,56 @@ func (c *Client) Do(req *fasthttp.Request) error {
 		c.responses = append(c.responses, nil)
 	} else {
 		c.responses = append(c.responses, resp)
+		c.page = NewPage()
+		c.page.URL, _ = url.Parse(requrl)
+		c.page.Redirects.Append(redirects...)
 	}
 
 	return err
 }
 
-//Parses fasthttp response to text
-func parseResponse(resp *fasthttp.Response) []byte {
+//Response pops the latest response from this client's list of responses
+//if the most recent request had an error or there are no more responses
+func (c *Client) Response() ([]byte, error) {
+	n := len(c.responses)
+	if n == 0 {
+		return nil, ErrEmpty
+	}
+	resp := c.responses[n-1]
+	c.responses = c.responses[:n-1]
 	if resp == nil {
-		return nil
+		return nil, ErrEmpty
 	}
 	var buf bytes.Buffer
 	w := bufio.NewWriter(&buf)
-	resp.WriteTo(w)
+	_, err := resp.WriteTo(w)
+	if err != nil {
+		return nil, err
+	}
 	w.Flush()
-	return buf.Bytes()
+	fasthttp.ReleaseResponse(resp)
+	return buf.Bytes(), nil
 }
 
-//Response pops the latest response from this client's list of responses
-//if the most recent request had an error or there are no more responses
-func (c *Client) Response() []byte {
-	var text []byte
-	n := len(c.responses)
-	if n == 0 {
-		return nil
-	} else {
-		resp := c.responses[n-1]
-		c.responses = c.responses[:n-1]
-		text = parseResponse(resp)
-		fasthttp.ReleaseResponse(resp)
-		return text
+// Page returns a *Page based on the most recent response from this client
+func (c *Client) Page() (*Page, error) {
+	if c.page != nil && len(c.page.Bytes) > 0 {
+		return c.page, nil
 	}
+	if c.page == nil {
+		c.page = NewPage()
+	}
+	// check non-nil responses if we haven't parsed a page in yet
+	for i := len(c.responses) - 1; i >= 0; i-- {
+		resp := c.responses[i]
+		if resp == nil {
+			continue
+		}
+		err := c.page.Parse(resp)
+		if err != nil {
+			return nil, err
+		}
+		return c.page, nil
+	}
+	return nil, ErrEmpty
 }
