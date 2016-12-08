@@ -3,13 +3,14 @@
 package condition
 
 import (
-	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"text/template"
 
 	"github.com/martianmarvin/gidra/config"
+	gtemplate "github.com/martianmarvin/gidra/template"
 )
 
 var (
@@ -30,6 +31,16 @@ var (
 	DefaultRetryLimit = 5
 )
 
+// Status Codes
+type Status int
+
+const (
+	StatusSuccess Status = iota
+	StatusFail
+	StatusAbort
+	StatusSkip
+)
+
 // Flags determining when condition should be checked
 const (
 	// Condition runs before task execution
@@ -42,19 +53,8 @@ const (
 	Once
 )
 
-//Output a template into a string
-func stringTemplate(t *template.Template, data interface{}) (text string, err error) {
-	var b bytes.Buffer
-	err = t.Execute(&b, data)
-	if err != nil {
-		return
-	}
-	text = b.String()
-	return text, err
-}
-
 // CallBackFunc represents an optional function to call if condition is met
-type CallBackFunc func() error
+type CallBackFunc func(ctx context.Context) error
 
 // Condition acts as a gate during the execution of a Sequence that determines
 // whether the sequence should continue to the next step, quit execution, or try
@@ -64,7 +64,7 @@ type CallBackFunc func() error
 // will cause the same step to be repeated again.
 type Condition interface {
 	// Check evaluates the Condition with provided variables and returns nil(for success) or an error
-	Check(vars map[string]interface{}) error
+	Check(ctx context.Context) error
 
 	// Parse parses and compiles a template.Template to validate this condition.
 	// The template is concatenated with an if pipeline to coerce the result to
@@ -104,7 +104,7 @@ type condition struct {
 
 // New returns a new empty condition
 func New() Condition {
-	return &condition{tmpl: template.New("").Option("missingkey=zero")}
+	return &condition{tmpl: template.New("")}
 }
 
 func (c *condition) Parse(cond string) error {
@@ -113,16 +113,17 @@ func (c *condition) Parse(cond string) error {
 		return ErrInvalidCondition
 	}
 
+	// Wrap in conditional
+	cond = strings.TrimPrefix(strings.TrimSpace(cond), "{{")
+	cond = strings.TrimSpace(strings.TrimSuffix(cond, "}}"))
+	cond = fmt.Sprintf("{{ if %s }} true {{end}}", cond)
+
 	// Create new clone template
-	c.tmpl, err = c.tmpl.Clone()
+	tmpl, err := gtemplate.New(cond)
 	if err != nil {
 		return err
 	}
 
-	// Wrap in conditional
-	cond = strings.TrimPrefix(strings.TrimSpace(cond), "{{")
-	cond = fmt.Sprintf("{{ if %s }} true {{end}}", cond)
-	tmpl, err := c.tmpl.Parse(cond)
 	if err == nil {
 		c.cond = cond
 		c.tmpl = tmpl
@@ -130,15 +131,13 @@ func (c *condition) Parse(cond string) error {
 	return err
 }
 
-// Checks if condition is met
-func (c *condition) isMet(vars map[string]interface{}) bool {
+// Checks if condition is met by executing the template using the provided data
+// as its context
+func (c *condition) isMet(data interface{}) bool {
 	if len(c.cond) == 0 {
 		return true
 	}
-	if vars == nil {
-		vars = make(map[string]interface{})
-	}
-	res, err := stringTemplate(c.tmpl, vars)
+	res, err := gtemplate.Execute(c.tmpl, data)
 	if err != nil {
 		panic(fmt.Sprintf("Condition '%s' died with error %s", c.cond, err.Error()))
 	}
@@ -152,8 +151,14 @@ func (c *condition) isMet(vars map[string]interface{}) bool {
 	}
 }
 
-func (c *condition) Check(vars map[string]interface{}) error {
-	if c.isMet(vars) {
+// Common checker, determines what from context gets passed to isMet
+func (c *condition) check(ctx context.Context) bool {
+	return c.isMet(gtemplate.GlobalFromContext(ctx))
+
+}
+
+func (c *condition) Check(ctx context.Context) error {
+	if c.check(ctx) {
 		return nil
 	} else {
 		return c.err

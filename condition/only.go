@@ -1,6 +1,9 @@
 package condition
 
-import "text/template"
+import (
+	"context"
+	"text/template"
+)
 
 // Only is the opposite of Skip. The task is executed if it is met, and
 // skipped otherwise
@@ -21,8 +24,8 @@ func NewOnly() Condition {
 	}
 }
 
-func (c *Only) Check(vars map[string]interface{}) error {
-	if c.isMet(vars) {
+func (c *Only) Check(ctx context.Context) error {
+	if c.check(ctx) {
 		return nil
 	} else {
 		return c.err

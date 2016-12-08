@@ -1,6 +1,9 @@
 package condition
 
-import "text/template"
+import (
+	"context"
+	"text/template"
+)
 
 // Retry keeps track of retries and attempts the task again as long as
 // less than RetryLimit attempts have been made. Optionally, callbacks are
@@ -37,12 +40,12 @@ func NewRetry(limit int, callbacks ...CallBackFunc) Condition {
 	}
 }
 
-func (c *Retry) Check(vars map[string]interface{}) error {
-	if c.isMet(vars) {
+func (c *Retry) Check(ctx context.Context) error {
+	if c.check(ctx) {
 		c.i += 1
 		if c.i <= c.RetryLimit {
 			for _, cb := range c.callbacks {
-				if err := cb(); err != nil {
+				if err := cb(ctx); err != nil {
 					break
 				}
 			}

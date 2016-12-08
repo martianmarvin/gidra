@@ -1,6 +1,9 @@
 package condition
 
-import "text/template"
+import (
+	"context"
+	"text/template"
+)
 
 // Skip returns nil(so execution of the task continues) if it is not
 // met
@@ -21,9 +24,9 @@ func NewSkip() Condition {
 	}
 }
 
-func (c *Skip) Check(vars map[string]interface{}) error {
-	if c.isMet(vars) {
-		return ErrSkip
+func (c *Skip) Check(ctx context.Context) error {
+	if c.check(ctx) {
+		return c.err
 	} else {
 		return nil
 	}

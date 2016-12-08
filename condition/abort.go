@@ -1,6 +1,9 @@
 package condition
 
-import "text/template"
+import (
+	"context"
+	"text/template"
+)
 
 // Abort returns ErrAbort if it is met, optionally executing a series of
 // callbacks before panicking. If any of the callbacks return an error, the
@@ -26,10 +29,10 @@ func NewAbort(callbacks ...CallBackFunc) Condition {
 	}
 }
 
-func (c *Abort) Check(vars map[string]interface{}) error {
-	if c.isMet(vars) {
+func (c *Abort) Check(ctx context.Context) error {
+	if c.check(ctx) {
 		for _, cb := range c.callbacks {
-			if err := cb(); err != nil {
+			if err := cb(ctx); err != nil {
 				break
 			}
 		}
