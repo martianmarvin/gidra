@@ -3,7 +3,6 @@ package datasource
 import "io"
 
 // WriteableTable represents a table that can be written to
-// The table is held in memory and does not write to file until Flush() is called
 type WriteableTable interface {
 	io.WriterTo
 

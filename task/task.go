@@ -2,10 +2,10 @@
 package task
 
 import (
+	"context"
+	"errors"
 	"sort"
 	"sync"
-
-	"github.com/martianmarvin/gidra/client"
 )
 
 var (
@@ -13,15 +13,28 @@ var (
 	registeredTasks = make(map[string]newTaskFunc)
 )
 
+// Errors
+var (
+	ErrNotImplemented = errors.New("This feature is not supported by the current task")
+)
+
 // Task is a single step in a Script
 type Task interface {
 	// Execute executes the task and returns an error if it did not complete
-	Execute(client client.Client, vars map[string]interface{}) error
+	Execute(ctx context.Context) error
 }
 
 type newTaskFunc func() Task
 
-//Register registers a new type of task, making it available to scripts
+// ExecFunc executes a task with the given context
+type ExecFunc func(ctx context.Context) error
+
+// ExecFunc also satisfies the Task inteface
+func (f ExecFunc) Execute(ctx context.Context) {
+	f(ctx)
+}
+
+// Register registers a new type of task, making it available to scripts
 func Register(action string, fn newTaskFunc) {
 	tasksMu.Lock()
 	defer tasksMu.Unlock()
@@ -34,7 +47,7 @@ func Register(action string, fn newTaskFunc) {
 	registeredTasks[action] = fn
 }
 
-//Tasks returns a sorted list of all available task types
+// Tasks returns a sorted list of all available task types
 func Tasks() []string {
 	tasksMu.RLock()
 	defer tasksMu.RUnlock()
@@ -46,7 +59,8 @@ func Tasks() []string {
 	return list
 }
 
-//New initializes and returns a task of the specified action
+// New initializes and returns a task of the specified action
+// This should be the only way new tasks are launched
 func New(action string) Task {
 	tasksMu.RLock()
 	defer tasksMu.RUnlock()
@@ -54,11 +68,21 @@ func New(action string) Task {
 	if !ok {
 		panic("No such task: " + action)
 	}
-	return fn()
+	t := fn()
+
+	//wrap for middleware
+	t = &task{task: t, name: action}
+
+	return t
 }
 
-//Run runs a task immediately, out of sequence
-func Run(c client.Client, action string, vars map[string]interface{}) error {
+// Run runs a task immediately, out of sequence
+func Run(ctx context.Context, action string) error {
 	t := New(action)
-	return t.Execute(c, vars)
+	return t.Execute(ctx)
+}
+
+// Execute runs the given task in a new context
+func Execute(t Task) error {
+	return t.Execute(context.Background())
 }

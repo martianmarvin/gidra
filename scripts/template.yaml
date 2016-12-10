@@ -1,15 +1,16 @@
 config:
+  verbosity: 4
   threads: 100
+  task_timeout: 15
   loop: 10
 
-default:
+http:
   follow_redirects: false
   headers:
     user-agent: Mozilla/5.0 (Windows NT 6.1; rv:45.0) Gecko/20100101 Firefox/45.0
     accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
     accept-language: en-US,en;q=0.5
     accept-encoding: gzip, deflate
-  timeout: 15
 
 vars:
   host: https://www.example.com
@@ -25,6 +26,10 @@ output:
   adapter: csv
   source: test/testout.csv
 
+proxy:
+  type: socks5
+  source: '{{ .Inputs.proxies }}'
+
 before:
   - get:
       url: http://icanhazip.com
@@ -36,12 +41,12 @@ tasks:
   - get:
       url: {{ .Vars.host }}
       success:
-        when: '{{ .Page.Status == 200 }}'
+        when: '{{ eq .Page.Status 200 }}'
   - extract:
       regex: 'csrf_token="(.*)"'
       as: csrf_token
   - post:
-      url: '{{ Vars.host }}/login'
+      url: '{{ .Vars.host }}/login'
       headers:
         referer: http://www.example.com
       params:
@@ -50,24 +55,24 @@ tasks:
       cookies:
         _token: $csrf_token
       success:
-        when: '{{ .Page.Status == 301 }}'
+        when: '{{ eq .Page.Status 301 }}'
       abort:
-        when: '{{ .Page.Status == 500 }}'
+        when: '{{ eq .Page.Status 500 }}'
       retry:
-        when: '{{ .Page.Url | .Contains "/banned" }}'
-        with: '.Proxies.Next'
+        when: '{{ .Page.Url | contains "/banned" }}'
+        with: 'next .Inputs.proxies'
         limit: 5
       fail:
-        when: '.Page.Body.Match "User .* not found"'
+        when: 'match .Page.Body "User .* not found"'
   - extract:
       element: "div.user>span.id"
       as: user_id
   - get:
       url: https://www.example.com/account
-      success: '.Page.Title == "Account"'
+      success: 'eq .Page.Title "Account"'
 
 finally:
   - post:
       url: http://www.example.com/webhook/success/{{.Uid}}
-      when: '.Success'
+      when: '$.Status.Success'
 

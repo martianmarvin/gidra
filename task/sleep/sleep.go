@@ -1,10 +1,9 @@
 package sleep
 
 import (
-	"fmt"
+	"context"
 	"time"
 
-	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
 )
 
@@ -17,7 +16,8 @@ func init() {
 }
 
 type Task struct {
-	task.BaseTask
+	task.Worker
+	task.Configurable
 
 	Config *Config
 }
@@ -27,19 +27,17 @@ type Config struct {
 }
 
 func NewTask() task.Task {
-	return &Task{
-		BaseTask: task.BaseTask{},
-		Config:   &Config{},
+	t := &Task{
+		Config: &Config{},
+		Worker: task.NewWorker(),
 	}
+	t.Configurable = task.NewConfigurable(t.Config)
+	return t
 }
 
-func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err error) {
-	if err = task.Configure(t, vars); err != nil {
-		return err
-	}
+func (t *Task) Execute(ctx context.Context) error {
 	t.Config.Duration *= time.Second
-	fmt.Println(t.Config)
+	t.Logger().WithField("seconds", t.Config.Duration).Info("Sleeping...")
 	time.Sleep(t.Config.Duration)
-
-	return err
+	return nil
 }

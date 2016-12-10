@@ -2,6 +2,7 @@ package extract
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"regexp"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/andybalholm/cascadia"
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
+	"github.com/martianmarvin/vars"
 )
 
 var (
@@ -22,7 +24,8 @@ func init() {
 }
 
 type Task struct {
-	task.BaseTask
+	task.Worker
+	task.Configurable
 
 	Config *Config
 }
@@ -39,10 +42,12 @@ type Config struct {
 }
 
 func NewTask() task.Task {
-	return &Task{
-		BaseTask: task.BaseTask{},
-		Config:   &Config{},
+	t := &Task{
+		Config: &Config{},
+		Worker: task.NewWorker(),
 	}
+	t.Configurable = task.NewConfigurable(t.Config)
+	return t
 }
 
 //Return the compiled matcher for this string key
@@ -114,13 +119,9 @@ func extractByElement(matcher cascadia.Selector, text []byte) []string {
 }
 
 // Execute extracts specified text
-func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err error) {
+func (t *Task) Execute(ctx context.Context) (err error) {
 	var results []string
 	var rk string
-
-	if err = task.Configure(t, vars); err != nil {
-		return err
-	}
 
 	if len(t.Config.Key) > 0 {
 		rk = t.Config.Key
@@ -133,12 +134,18 @@ func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err e
 		return errors.New("A regex or element selector is required to extract")
 	}
 
-	_, ok := vars[rk]
+	taskVars := vars.FromContext(ctx)
+	extracted := taskVars.Get(rk).MustStringArray()
+
+	client, ok := client.FromContext(ctx)
 	if !ok {
-		vars[rk] = make([]string, 0)
+		return errors.New("No client to extract from, make an http request first")
 	}
 
-	text := client.Response()
+	text, err := client.Response()
+	if err != nil {
+		return err
+	}
 	if len(text) == 0 {
 		return errors.New("Response text is empty, nothing to extract")
 	}
@@ -161,14 +168,10 @@ func (t *Task) Execute(client client.Client, vars map[string]interface{}) (err e
 		return err
 	}
 
-	extracted, ok := vars[rk].([]string)
-	if !ok {
-		return errors.New("Could not append result to extracted")
-	}
-
 	for _, res := range results {
 		extracted = append(extracted, res)
 	}
+	taskVars.SetPath(rk, extracted)
 
 	return err
 }
