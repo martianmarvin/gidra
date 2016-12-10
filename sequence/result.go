@@ -36,6 +36,14 @@ func (r *Result) Success() bool {
 	return (r.Output != nil && len(r.Errors) == 0)
 }
 
+// Err returns the most recent error
+func (r *Result) Err() error {
+	if len(r.Errors) == 0 {
+		return nil
+	}
+	return r.Errors[len(r.Errors)-1]
+}
+
 // ReadContext populates this result's Output with the output vars found in the
 // context and returns a list of variables that were saved
 func (r *Result) ReadContext(ctx context.Context) []string {
@@ -73,7 +81,7 @@ func (r *Result) ReadVars(taskVars *vars.Vars) []string {
 	return found
 }
 
-// Include adds the specified key to the list of variables the result reads into
+// Keep adds the specified key to the list of variables the result reads into
 // its output. It returns the result instance, so it is chainable
 func (r *Result) Keep(key string) *Result {
 	r.outputVars = append(r.outputVars, key)

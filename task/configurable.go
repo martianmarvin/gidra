@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fatih/structs"
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/vars"
 	"github.com/mitchellh/mapstructure"
 )
@@ -52,7 +53,7 @@ func NewConfigurable(configStruct interface{}) Configurable {
 		if len(name) == 0 {
 			name = k
 		}
-		if flags.IsSet(FieldRequired) {
+		if flags.IsSet(config.FieldRequired) {
 			c.required = append(c.required, name)
 		}
 	}
@@ -93,7 +94,7 @@ func (c *configurable) Configure(taskVars *vars.Vars) error {
 	return nil
 }
 
-func parseFieldTag(tag string) (name string, flags ConfigFlag) {
+func parseFieldTag(tag string) (name string, flags config.Flag) {
 	if len(tag) == 0 {
 		return
 	}
@@ -102,11 +103,11 @@ func parseFieldTag(tag string) (name string, flags ConfigFlag) {
 	for _, ft := range fieldTags {
 		switch ft {
 		case "-":
-			flags.Set(FieldSkip)
+			flags.Set(config.FieldSkip)
 		case "required":
-			flags.Set(FieldRequired)
+			flags.Set(config.FieldRequired)
 		case "omitempty":
-			flags.Set(FieldOmitEmpty)
+			flags.Set(config.FieldOmitEmpty)
 		default:
 			if len(name) == 0 {
 				name = ft

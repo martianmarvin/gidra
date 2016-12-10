@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/martianmarvin/gidra/config"
 )
 
 // The default global log
@@ -39,7 +38,8 @@ func initLogger() {
 	logger = logrus.WithField("task", "gidra")
 }
 
-func setLevel(lvl logrus.Level) {
+// SetLevel sets the global log level
+func SetLevel(lvl logrus.Level) {
 	if lvl > 0 && lvl <= 5 {
 		logrus.SetLevel(lvl)
 	}
@@ -61,8 +61,5 @@ func FromContext(ctx context.Context) Log {
 	if !ok {
 		l = Logger()
 	}
-	// Set verbosity from config
-	cfg := config.FromContext(ctx)
-	logrus.SetLevel(logrus.Level(cfg.UInt(cfgLogLevel, int(defaultLevel))))
 	return l
 }

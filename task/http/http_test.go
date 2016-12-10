@@ -13,20 +13,23 @@ import (
 
 // Helper to run an http request
 func testReq(t *testing.T, tsk task.Task, params map[string]interface{}) {
+	assert := assert.New(t)
+
 	taskVars := vars.NewFromMap(params)
 
 	ctx := vars.ToContext(context.Background(), taskVars)
 	ctx = httpclient.ToContext(ctx, httpclient.New())
 
 	err := tsk.Execute(ctx)
-	assert.NoError(t, err)
+	assert.NoError(err)
 
 	client, ok := httpclient.FromContext(ctx)
 	require.True(t, ok)
-	assert.NotNil(t, client)
+	assert.NotNil(client)
 
-	resp := client.Response()
-	assert.NotEmpty(t, resp)
+	resp, err := client.Response()
+	assert.NoError(err)
+	assert.NotEmpty(resp)
 
 	// t.Log(string(resp))
 }

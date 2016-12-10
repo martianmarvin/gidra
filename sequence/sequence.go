@@ -23,20 +23,15 @@ type Sequence struct {
 	//List of conditions corresponding to tasks in the sequence
 	conditions [][]condition.Condition
 
-	//The results for tasks once they have ran
-	Results []*Result
-
 	//Context shared by all requests in this sequence
 	ctx context.Context
 
 	cancel context.CancelFunc
 }
 
-func New(id int) *Sequence {
+func New() *Sequence {
 	s := &Sequence{
-		Id:         id,
 		Tasks:      make([]task.Task, 0),
-		Results:    make([]*Result, 0),
 		conditions: make([][]condition.Condition, 0),
 	}
 	s.ctx, s.cancel = context.WithCancel(defaultContext())
@@ -61,7 +56,7 @@ func (s *Sequence) Context() context.Context {
 
 // WithContext returns a shallow copy of the Sequence with the new context
 func (s *Sequence) WithContext(ctx context.Context) *Sequence {
-	s2 := New(s.Id + 1)
+	s2 := New()
 	*s2 = *s
 
 	seqVars := vars.FromContext(ctx)
@@ -86,7 +81,6 @@ func (s *Sequence) Add(task task.Task, conds []condition.Condition) int {
 	}
 
 	s.Tasks = append(s.Tasks, task)
-	s.Results = append(s.Results, NewResult())
 	s.conditions = append(s.conditions, conds)
 	return s.Size()
 }
@@ -104,43 +98,40 @@ func (s *Sequence) executeStep(n int) error {
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok = r.(error); !ok {
-				fmt.Errorf("sequence [%d]: %v", n, r)
+				err = fmt.Errorf("sequence [%d]: %v", n, r)
 			}
 		}
-		s.errors[n] = err
 	}()
 	// Step through conditions at this step, to determine whether this
 	// task should be executed
 	tsk := s.Tasks[n]
-	seqVars := vars.FromContext(s.ctx)
 	for _, cond := range s.conditions[n] {
 		for {
 			// This for loop executes inside a single condition
-			err = cond.Check(seqVars.Map())
+			err = cond.Check(s.ctx)
 			switch err {
 			case nil:
 				// Only run the task if it has not yet run
 				if !runLatch {
 					//This must be a precondition
-					s.errors[n] = tsk.Execute(s.ctx)
 					runLatch = true
+					err = tsk.Execute(s.ctx)
 				}
 				// Regardless of whether the task was run,
 				// break out of this condition and
 				// continue to the next one
 				break
-			case ErrSkip:
+			case condition.ErrSkip:
 				return err
-			case ErrAbort:
+			case condition.ErrAbort:
 				//TODO Better handle panic? Should never get here anyway
 				return err
-			case ErrRetry:
+			case condition.ErrRetry:
 				// Run task, but stay inside this condition
 				// The condition is responsible for signaling when we
 				// should stop retrying
-				s.errors[n] = tsk.Execute(s.ctx)
 				continue
-			case ErrFail:
+			case condition.ErrFail:
 				return err
 			}
 		}
@@ -149,26 +140,23 @@ func (s *Sequence) executeStep(n int) error {
 }
 
 //Execute executes all remaining incomplete tasks in the Sequence
-func (s *Sequence) Execute() []error {
+func (s *Sequence) Execute() *Result {
+	var err error
+	res := NewResult()
 	for n, _ := range s.Tasks[s.n:] {
 		// set number of current step
 		s.n = n
-		err := s.executeStep(s.n)
+		err = s.executeStep(s.n)
+		if err != nil {
+			res.Errors = append(res.Errors, err)
+		}
 
 		//TODO Instrument logging here
-		if err == ErrAbort || err == ErrFail {
+		if err == condition.ErrAbort || err == condition.ErrFail {
 			break
 		}
 	}
 	s.cancel()
-	return s.errors
-}
-
-// Configure merges each map of variables, and applies them to this sequence
-// This method is safe to use concurrently from multiple goroutines
-func (s *Sequence) Configure(nvars ...*vars.Vars) {
-	seqVars := vars.FromContext(s.ctx)
-	for _, v := range nvars {
-		seqVars.Extend(v)
-	}
+	res.ReadContext(s.ctx)
+	return res
 }

@@ -142,7 +142,10 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 		return errors.New("No client to extract from, make an http request first")
 	}
 
-	text := client.Response()
+	text, err := client.Response()
+	if err != nil {
+		return err
+	}
 	if len(text) == 0 {
 		return errors.New("Response text is empty, nothing to extract")
 	}
