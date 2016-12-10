@@ -2,12 +2,19 @@ package script
 
 import (
 	"context"
+	"errors"
+	"os"
 	"sync"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/log"
+	"github.com/martianmarvin/gidra/script/options"
+	"github.com/martianmarvin/gidra/script/parser"
 	"github.com/martianmarvin/gidra/sequence"
+	"github.com/martianmarvin/gidra/template"
 )
 
 var Logger = log.Logger()
@@ -16,31 +23,26 @@ var Logger = log.Logger()
 // Unlike a Sequence or Task, a Script is fully concurrency-safe and executes
 // multiple Sequences concurrently
 type Script struct {
-	//How many times the script should loop total
-	Loop int
-
-	//Threads is the number of concurrent sequences executing
-	Threads int
+	Options *options.ScriptOptions
 
 	// The queue of sequences to execute
 	queue chan *sequence.Sequence
 
-	// Datasources to read from
-	input map[string]datasource.ReadableTable
-
-	output *datasource.WriteCloser
+	// Channel that receives results from completed sequences
+	results chan *sequence.Result
 }
 
 // New initializes a new Script
 func New() *Script {
 	return &Script{
-		queue: make(chan *Sequence, 1),
+		queue: make(chan *sequence.Sequence, 1),
 	}
 }
 
 // Open reads a script file and Loads it into a script instance
 func Open(name string) (*Script, error) {
-	cfg, err := parseScript(name)
+	f, err := os.Open(name)
+	cfg, err := config.ParseYaml(f)
 	if err != nil {
 		return nil, err
 	}
@@ -53,63 +55,53 @@ func Open(name string) (*Script, error) {
 }
 
 // Load loads a script file and initializes Sequences
-// Once Load has been called on the script, no new sequences can be added, and
-// it should not be called again.
 func (s *Script) Load(cfg *config.Config) (err error) {
-	ctx := context.Background()
 
-	seqVars := parseVars(cfg)
-
-	s.Threads, _ = cfg.Int(cfgConfigThreads)
-
-	beforeSequence, err = parseSequence(cfgSeqBefore, cfg)
-	if err == nil {
-		s.Add(beforeSequence)
-	}
-
-	mainSequence, err = parseSequence(cfgSeqTasks, cfg)
+	//Parse yaml script
+	err = parser.Configure(s.Options, cfg)
 	if err != nil {
-		// Main sequence is required
 		return err
 	}
 
-	//TODO construct vars from input for each sequence
-	for i := 0; i <= s.Loop; i++ {
-		ivars := parseInputVars(params)
-		seq, err := s.Sequence.Clone()
-		if err != nil {
-			return err
-		}
-		seq.Configure(s.Vars, ivars)
-		s.Add(seq)
+	ctx := configureContext(context.Background(), s.Options)
+
+	if seq := s.Options.BeforeSequence; seq != nil {
+		s.Add(seq.WithContext(ctx))
 	}
 
-	afterSequence, err = parseSequence(cfgSeqAfter, cfg)
-	if err == nil {
-		s.AfterSequence.Configure(s.Vars)
-		s.Add(s.AfterSequence)
+	if s.Options.MainSequence == nil {
+		return errors.New("Could not parse task list")
 	}
 
-	close(s.queue)
+	for i := 0; i <= s.Options.Loop; i++ {
+		s.Add(s.Options.MainSequence.WithContext(ctx))
+	}
+
+	if seq := s.Options.AfterSequence; seq != nil {
+		s.Add(seq.WithContext(ctx))
+	}
 
 	return err
 }
 
 // Add adds a new sequence to the Script's queue
-func (s *Script) Add(seq *Sequence) {
+func (s *Script) Add(seq *sequence.Sequence) {
 	go func() {
 		s.queue <- seq
 	}()
 }
 
 // Run runs all of the script's sequences
+// Once Run has been called on the script, no new sequences can be added, and
+// it should not be called again.
 func (s *Script) Run() {
+	close(s.queue)
 	var wg sync.WaitGroup
 	results := make(chan *sequence.Result)
-	go resultProcessor(results)
+	go resultProcessor(results, s.Options.Output)
 
 	Logger.Info("Starting Workers")
-	for i := 0; i < s.Threads; i++ {
+	for i := 0; i < s.Options.Threads; i++ {
 		wg.Add(1)
 		go runner(s.queue, results, &wg)
 	}
@@ -137,4 +129,31 @@ func resultProcessor(results <-chan *sequence.Result, output datasource.Writeabl
 		}
 
 	}
+}
+
+// Instantiates context with global objects based on options
+func configureContext(ctx context.Context, opts *options.ScriptOptions) context.Context {
+	// Log
+	log.SetLevel(logrus.Level(opts.Verbosity))
+	ctx = log.ToContext(ctx, log.Logger())
+
+	// HTTP Client
+	if opts.HTTP != nil {
+		client := httpclient.New().WithOptions(opts.HTTP)
+		ctx = httpclient.ToContext(ctx, client)
+	}
+
+	// Template Globals
+	g := template.NewGlobal()
+	if opts.Vars != nil {
+		g.Vars = opts.Vars.Map()
+	}
+
+	if len(opts.Input) > 0 {
+		g.Inputs = opts.Input
+	}
+
+	ctx = template.GlobalToContext(ctx, g)
+
+	return ctx
 }

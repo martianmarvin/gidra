@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/olebedev/config"
 )
@@ -23,16 +25,19 @@ var defaultConfig = `
 config:
 	verbosity: 4
 	threads: 100
+	loop: 1
 	task_timeout: 15
-	http:
-		follow_redirects: false
-		headers:
-			user-agent: Mozilla/5.0 (Windows NT 6.1; rv:45.0) Gecko/20100101 Firefox/45.0
-			accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
-			accept-language: en-US,en;q=0.5
-			accept-encoding: gzip, deflate
-loop: 1
+http:
+	follow_redirects: false
+	headers:
+		user-agent: Mozilla/5.0 (Windows NT 6.1; rv:45.0) Gecko/20100101 Firefox/45.0
+		accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+		accept-language: en-US,en;q=0.5
+		accept-encoding: gzip, deflate
 `
+
+// The default top level config object
+var cfg *Config
 
 // Config wraps the config.Config struct with additional helper methods
 type Config struct {
@@ -46,15 +51,6 @@ func New() *Config {
 	}
 }
 
-// CheckGet returns the config at path, or false if it does not exist
-func (cfg *Config) CheckGet(path string) (*Config, bool) {
-	subcfg, err := cfg.Config.Get(path)
-	if err != nil {
-		return nil, false
-	}
-	return &Config{Config: subcfg}, true
-}
-
 // Get returns the config at path, or the default if not found
 func (cfg *Config) Get(path string, def *Config) *Config {
 	c, ok := cfg.CheckGet(path)
@@ -62,6 +58,15 @@ func (cfg *Config) Get(path string, def *Config) *Config {
 		return def
 	}
 	return c
+}
+
+// CheckGet returns the config at path, or false if it does not exist
+func (cfg *Config) CheckGet(path string) (*Config, bool) {
+	subcfg, err := cfg.Config.Get(path)
+	if err != nil {
+		return nil, false
+	}
+	return &Config{Config: subcfg}, true
 }
 
 // StringMap returns a map with string values
@@ -128,7 +133,7 @@ func (cfg *Config) UStringList(path string, defaults ...[]string) []string {
 	return list
 }
 
-// MapList returns a list of map[string]interface{}
+// MapList returns a slice of map[string]interface{}
 func (cfg *Config) MapList(path string) ([]map[string]interface{}, error) {
 	list := make([]map[string]interface{}, 0)
 	l, err := cfg.List(path)
@@ -144,8 +149,68 @@ func (cfg *Config) MapList(path string) ([]map[string]interface{}, error) {
 	return list, nil
 }
 
-// The default top level config object
-var cfg *Config
+// CList returns a slice of Config objects that can be accessed with the
+// other methods
+func (cfg *Config) CList(path string) ([]*Config, error) {
+	list := make([]*Config, 0)
+	l, err := cfg.List(path)
+	if err != nil {
+		return nil, err
+	}
+	for i, _ := range l {
+		c, err := cfg.Config.Get(fmt.Sprintf("%s.%d", path, i))
+		if err == nil {
+			list = append(list, &Config{Config: c})
+		}
+	}
+	return list, nil
+}
+
+// Duration returns a time.Duration from a dictionary
+func (cfg *Config) Duration(path string) (time.Duration, error) {
+	var t time.Duration
+	// Try parsing an int first, defaulting to seconds
+	i, err := cfg.Int(path)
+	if err == nil {
+		t = time.Duration(i) * time.Second
+		return t, nil
+	}
+
+	m, err := cfg.Map(path)
+	if err != nil {
+		return 0, err
+	}
+
+	for key, _ := range m {
+		val, err := cfg.Int(path + "." + key)
+		if err != nil {
+			return 0, err
+		}
+		var unit time.Duration
+		switch key {
+		case "milliseconds", "ms":
+			unit = time.Millisecond
+		case "seconds", "s":
+			unit = time.Second
+		case "hours", "h":
+			unit = time.Hour
+		default:
+			unit = 0
+		}
+		t += time.Duration(val) * unit
+	}
+
+	return t, nil
+}
+
+// URL returns a *url.URL from a string
+func (cfg *Config) URL(path string) (*url.URL, error) {
+	rawurl, err := cfg.String(path)
+	if err != nil {
+		return nil, err
+	}
+	return url.Parse(rawurl)
+}
 
 // ParseYAML creates a new config from a yaml file
 func ParseYaml(r io.Reader) (*Config, error) {
@@ -179,12 +244,6 @@ func init() {
 	r := strings.NewReader(defaultConfig)
 	cfg = Must(ParseYaml(r))
 }
-
-// Global settings not used inside tasks, therefore not subject to config file
-var (
-	// Location of script files
-	ScriptDir = "./scripts"
-)
 
 // Default returns the default config
 func Default() *Config {
