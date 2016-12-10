@@ -3,35 +3,34 @@ package httpclient
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"net"
 	"net/url"
 	"time"
 
+	"github.com/imdario/mergo"
 	"github.com/martianmarvin/conn"
-	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/fastcookiejar"
+	"github.com/martianmarvin/gidra/script/options"
 	"github.com/valyala/fasthttp"
+)
+
+// Context key
+type contextKey int
+
+const (
+	ctxClient contextKey = iota
 )
 
 var defaultTimeout time.Duration = 15 * time.Second
 
-// Config key names
-var (
-	cfgRoot            = "config.http"
-	cfgFollowRedirects = "follow_redirects"
-	cfgHeaders         = "headers"
-	cfgTimeout         = "timeout"
-	cfgProxy           = "proxy"
-)
-
-// Errors
-var (
-	ErrNoConfig = errors.New("Config not found")
-)
-
 type Client struct {
-	// Tthe underlying connection
+	// Options are globally applied to each request by the client
+	Options *options.HTTPOptions
+
+	// The underlying connection
 	conn net.Conn
 
 	//The underlying fasthttp.Client instance
@@ -40,78 +39,59 @@ type Client struct {
 	//Underlying dialer, possible including proxy connection
 	dialer *conn.Dialer
 
-	// The proxy this client should use
-	proxy *url.URL
-
 	//The cookie jar shared between tasks using this client
 	jar *fastcookiejar.Jar
-
-	//Global headers
-	headers map[string]string
-
-	// Request timeout
-	timeout time.Duration
-
-	followRedirects bool
 
 	//All responses from requests made by this client
 	responses []*fasthttp.Response
 
 	// page is the most recent page requested by this client
-	page *Page
+	page *client.Page
+}
+
+// ToContext attaches a client to this context
+func ToContext(ctx context.Context, c *Client) context.Context {
+	// Also save to top-level Client slot
+	ctx = client.ToContext(ctx, c)
+	return context.WithValue(ctx, ctxClient, c)
+}
+
+// FromContext returns the most recent client that was saved in this context
+func FromContext(ctx context.Context) (*Client, bool) {
+	c, ok := ctx.Value(ctxClient).(*Client)
+	if !ok {
+		return nil, false
+	}
+	return c, true
 }
 
 // New initializes an HTTP client with default settings
 func New() *Client {
 	c := &Client{
-		client:          &fasthttp.Client{},
-		dialer:          conn.NewDialer(),
-		jar:             fastcookiejar.New(),
-		timeout:         defaultTimeout,
-		followRedirects: true,
-		responses:       make([]*fasthttp.Response, 0),
+		client:    &fasthttp.Client{},
+		dialer:    conn.NewDialer(),
+		jar:       fastcookiejar.New(),
+		responses: make([]*fasthttp.Response, 0),
+		Options: &options.HTTPOptions{
+			Timeout: defaultTimeout,
+		},
 	}
 	c.client.Dial = c.dialer.FastDial
 	return c
 }
 
-// Configure applies settings from the config to this client
-func (c *Client) Configure(cfg *config.Config) error {
-	var err error
-	cfg, ok := cfg.CheckGet(cfgRoot)
-	if !ok {
-		return ErrNoConfig
-	}
+// WithOptions applies settings from the Options struct to this client
+func (c *Client) WithOptions(opts *options.HTTPOptions) *Client {
+	mergo.MergeWithOverwrite(c.Options, opts)
+	// Add cookies to jar for all domains
+	c.jar.SetMap(".", c.Options.Cookies)
+	return c
 
-	if rawproxy, err := cfg.String(cfgProxy); err == nil && len(rawproxy) > 0 {
-		u, err := url.Parse(rawproxy)
-		if err == nil {
-			c.proxy = u
-		} else {
-			return err
-		}
-	}
-
-	if headers, err := cfg.StringMap(cfgHeaders); err == nil {
-		for k, v := range headers {
-			c.headers[k] = v
-		}
-	}
-
-	if follow, err := cfg.Bool(cfgFollowRedirects); err == nil {
-		c.followRedirects = follow
-	}
-
-	// timeout is int seconds
-	if timeout, err := cfg.Int(cfgTimeout); err == nil {
-		c.timeout = (time.Duration(timeout) * time.Second)
-	}
-	return err
 }
 
 func (c *Client) Dial(addr string) (net.Conn, error) {
 	var err error
-	c.conn, err = c.dialer.Dial(addr, c.proxy)
+	c.conn, err = c.dialer.Dial(addr, c.Options.Proxy)
 	return c.conn, err
 }
 
@@ -130,7 +110,7 @@ func (c *Client) Close() error {
 // Apply client's headers and cookies to request
 func (c *Client) buildRequest(req *fasthttp.Request) *fasthttp.Request {
 	//Apply global client headers if not in request
-	for k, v := range c.headers {
+	for k, v := range c.Options.Headers {
 		if len(req.Header.Peek(k)) == 0 {
 			req.Header.Set(k, v)
 		}
@@ -155,8 +135,13 @@ func getRedirectURL(baseURL string, location []byte) string {
 
 //Do executes the request, applying all client-global options and returns the
 //response
-func (c *Client) Do(req *fasthttp.Request) error {
+func (c *Client) Do(r interface{}) error {
 	var err error
+
+	req, ok := r.(*fasthttp.Request)
+	if !ok {
+		return errors.New("This client can only execute a request of type *fasthttp.Request")
+	}
 
 	req = c.buildRequest(req)
 	resp := fasthttp.AcquireResponse()
@@ -167,7 +152,7 @@ func (c *Client) Do(req *fasthttp.Request) error {
 	redirects = append(redirects, requrl)
 
 	for {
-		err = c.client.DoTimeout(req, resp, c.timeout)
+		err = c.client.DoTimeout(req, resp, c.Options.Timeout)
 		if err != nil {
 			break
 		}
@@ -175,7 +160,7 @@ func (c *Client) Do(req *fasthttp.Request) error {
 		resp.Header.VisitAllCookie(c.jar.SetBytes)
 		statusCode := resp.Header.StatusCode()
 
-		if !c.followRedirects ||
+		if !c.Options.FollowRedirects ||
 			!(statusCode == 301 || statusCode == 302 || statusCode == 303) {
 			break
 		}
@@ -194,7 +179,7 @@ func (c *Client) Do(req *fasthttp.Request) error {
 		c.responses = append(c.responses, nil)
 	} else {
 		c.responses = append(c.responses, resp)
-		c.page = NewPage()
+		c.page = client.NewPage()
 		c.page.URL, _ = url.Parse(requrl)
 		c.page.Redirects.Append(redirects...)
 	}
@@ -207,12 +192,12 @@ func (c *Client) Do(req *fasthttp.Request) error {
 func (c *Client) Response() ([]byte, error) {
 	n := len(c.responses)
 	if n == 0 {
-		return nil, ErrEmpty
+		return nil, client.ErrEmpty
 	}
 	resp := c.responses[n-1]
 	c.responses = c.responses[:n-1]
 	if resp == nil {
-		return nil, ErrEmpty
+		return nil, client.ErrEmpty
 	}
 	var buf bytes.Buffer
 	w := bufio.NewWriter(&buf)
@@ -226,12 +211,12 @@ func (c *Client) Response() ([]byte, error) {
 }
 
 // Page returns a *Page based on the most recent response from this client
-func (c *Client) Page() (*Page, error) {
+func (c *Client) Page() (*client.Page, error) {
 	if c.page != nil && len(c.page.Bytes) > 0 {
 		return c.page, nil
 	}
 	if c.page == nil {
-		c.page = NewPage()
+		c.page = client.NewPage()
 	}
 	// check non-nil responses if we haven't parsed a page in yet
 	for i := len(c.responses) - 1; i >= 0; i-- {
@@ -245,5 +230,5 @@ func (c *Client) Page() (*Page, error) {
 		}
 		return c.page, nil
 	}
-	return nil, ErrEmpty
+	return nil, client.ErrEmpty
 }

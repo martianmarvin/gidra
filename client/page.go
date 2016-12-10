@@ -1,10 +1,9 @@
-package httpclient
+package client
 
 import (
 	"bytes"
 	"errors"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -16,71 +15,6 @@ import (
 var (
 	ErrEmpty = errors.New("Body is empty")
 )
-
-// URLList is a list of URLs
-type URLList []*url.URL
-
-// Append parses and adds URLs to the list
-func (l URLList) Append(rawurls ...string) URLList {
-	for _, rawurl := range rawurls {
-		u, err := url.Parse(rawurl)
-		if err == nil {
-			l = append(l, u)
-		}
-	}
-	return l
-}
-
-func (l URLList) Contains(u *url.URL) bool {
-	for _, lu := range l {
-		if lu.String() == u.String() {
-			return true
-		}
-	}
-	return false
-}
-
-// ContainsRegex checks if any of the URLs in the list match a given regex
-func (l URLList) ContainsRegex(re *regexp.Regexp) bool {
-	for _, lu := range l {
-		if matched := re.MatchString(lu.String()); matched {
-			return true
-		}
-	}
-	return false
-}
-
-type Form struct {
-	Method string
-
-	URL *url.URL
-
-	Fields map[string]string
-}
-
-// NewForm returns a new empty Form
-func NewForm() *Form {
-	return &Form{Fields: make(map[string]string)}
-}
-
-type FormList []*Form
-
-// Fields returns the combined fields of all forms in this list
-func (l FormList) Fields() map[string]string {
-	fields := make(map[string]string)
-	for n, form := range l {
-		if len(form.Fields) == 0 {
-			continue
-		}
-		for key, val := range form.Fields {
-			if _, ok := fields[key]; ok {
-				key = key + "." + strconv.Itoa(n)
-			}
-			fields[key] = val
-		}
-	}
-	return fields
-}
 
 // Page represents a single http response with easier accessors that
 // *fasthttp.Response
