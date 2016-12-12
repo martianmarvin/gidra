@@ -23,7 +23,7 @@ type Page struct {
 
 	URL *url.URL
 
-	Redirects URLList
+	Redirects *URLList
 
 	Status int
 
@@ -52,7 +52,7 @@ func NewPage() *Page {
 		Headers:   make(map[string]string),
 		Cookies:   make(map[string]string),
 		Forms:     make(FormList, 0),
-		Redirects: make(URLList, 0),
+		Redirects: NewURLList(),
 	}
 }
 

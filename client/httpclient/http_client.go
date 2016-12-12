@@ -76,6 +76,7 @@ func New() *Client {
 			Timeout: defaultTimeout,
 		},
 	}
+	c.dialer.Proxy = c.Options.Proxies[0]
 	c.client.Dial = c.dialer.FastDial
 	return c
 }
