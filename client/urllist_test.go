@@ -18,17 +18,17 @@ func TestURLList(t *testing.T) {
 	assert.Equal(l.Len(), len(testurls))
 
 	for _, testurl := range testurls {
-		u, ok := l.Next()
-		assert.True(ok)
+		u, err := l.Next()
+		assert.NoError(err)
 		assert.Equal(testurl, u.String())
 	}
-	u, ok := l.Next()
-	assert.False(ok)
+	u, err := l.Next()
+	assert.Error(err)
 	assert.Nil(u)
 
 	l.Rewind()
-	u, ok = l.Next()
-	assert.True(ok)
+	u, err = l.Next()
+	assert.NoError(err)
 	assert.Equal(testurls[0], u.String())
 
 }

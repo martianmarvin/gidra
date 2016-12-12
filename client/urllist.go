@@ -1,6 +1,7 @@
 package client
 
 import (
+	"io"
 	"net/url"
 	"regexp"
 	"runtime"
@@ -57,15 +58,15 @@ func (l *URLList) Len() int {
 	return len(l.urls)
 }
 
-// Next returns the next URL from the iterator, or nil, false if it does not
+// Next returns the next URL from the iterator, or io.EOF if there are no more
 // exist
-func (l *URLList) Next() (*url.URL, bool) {
+func (l *URLList) Next() (*url.URL, error) {
 	runtime.Gosched()
 	select {
 	case u := <-l.ch:
-		return u, true
+		return u, nil
 	default:
-		return nil, false
+		return nil, io.EOF
 	}
 }
 
