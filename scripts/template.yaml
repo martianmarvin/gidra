@@ -11,24 +11,23 @@ http:
     accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
     accept-language: en-US,en;q=0.5
     accept-encoding: gzip, deflate
+  proxy:
+    type: socks5
+    source: ./test/proxies.txt
 
 vars:
   host: https://www.example.com
 
 inputs:
-  - source: test/in.csv
-    adapter: csv
-  - source: test/proxies.txt
-    adapter: txt
-    as: proxies
+  - source: ./test/in.csv
+    type: csv
+  - source: ./test/users.txt
+    type: txt
+    as: users
 
 output:
   adapter: csv
-  source: test/testout.csv
-
-proxy:
-  type: socks5
-  source: '{{ .Inputs.proxies }}'
+  source: ./test/testout.csv
 
 before:
   - get:
@@ -39,7 +38,7 @@ before:
 
 tasks:
   - get:
-      url: {{ .Vars.host }}
+      url: '{{ .Vars.host }}'
       success:
         when: '{{ eq .Page.Status 200 }}'
   - extract:
@@ -60,7 +59,7 @@ tasks:
         when: '{{ eq .Page.Status 500 }}'
       retry:
         when: '{{ .Page.Url | contains "/banned" }}'
-        with: 'next .Inputs.proxies'
+        with: '.Proxy.Next'
         limit: 5
       fail:
         when: 'match .Page.Body "User .* not found"'

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"io"
 	"net/url"
 	"regexp"
@@ -9,8 +10,9 @@ import (
 
 // URLList is a list of URLs
 type URLList struct {
-	urls []*url.URL
-	ch   chan *url.URL
+	urls    []*url.URL
+	current *url.URL
+	ch      chan *url.URL
 }
 
 // NewURLList initializes a new URL list
@@ -21,8 +23,16 @@ func NewURLList() *URLList {
 	}
 }
 
-// Append parses and adds URLs to the list
-func (l *URLList) Append(rawurls ...string) *URLList {
+// TODO append without rewinding
+// Append appends URLs to the list
+func (l *URLList) Append(urls ...*url.URL) *URLList {
+	l.urls = append(l.urls, urls...)
+	l.Rewind()
+	return l
+}
+
+// AppendString parses and adds URLs to the list
+func (l *URLList) AppendString(rawurls ...string) *URLList {
 	for _, rawurl := range rawurls {
 		u, err := url.Parse(rawurl)
 		if err == nil {
@@ -64,10 +74,19 @@ func (l *URLList) Next() (*url.URL, error) {
 	runtime.Gosched()
 	select {
 	case u := <-l.ch:
+		l.current = u
 		return u, nil
 	default:
 		return nil, io.EOF
 	}
+}
+
+// Current returns the last URL from the iterator without advancing it
+func (l *URLList) Current() (*url.URL, error) {
+	if l.current == nil {
+		return nil, errors.New("No result available, call Next()")
+	}
+	return l.current, nil
 }
 
 // Rewind resets the iterator to the beginning

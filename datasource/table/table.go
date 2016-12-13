@@ -35,10 +35,13 @@ type importFunc func(data []byte) (*tablib.Dataset, error)
 // exportFunc exports the dataset into a specific format
 type exportFunc func(d *tablib.Dataset) (*tablib.Exportable, error)
 
+//TODO Separate reader for non tabular data like .txt?
+
 var (
 	importers = map[string]importFunc{
 		"csv":  tablib.LoadCSV,
 		"tsv":  tablib.LoadTSV,
+		"txt":  tablib.LoadTSV, //temp
 		"json": tablib.LoadJSON,
 		"xml":  tablib.LoadXML,
 		"yaml": tablib.LoadYAML,
@@ -47,6 +50,7 @@ var (
 	exporters = map[string]exportFunc{
 		"csv":  dataCSV,
 		"tsv":  dataTSV,
+		"txt":  dataTSV,
 		"xlsx": dataXLSX,
 		"html": dataHTML,
 		"json": dataJSON,

@@ -7,6 +7,7 @@ import (
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/script/options"
 	"github.com/martianmarvin/gidra/sequence"
+	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/gidra/template"
 	"github.com/martianmarvin/vars"
 )
@@ -74,6 +75,45 @@ func afterSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 // Parses config into a new sequence and initializes tasks
 func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 	seq := sequence.New()
+	for _, taskcfg := range taskList {
+		var taskName string
+		var taskConds []condition.Condition
+		var taskVars *vars.Vars
+		m, err := taskcfg.Map("")
+		if err != nil {
+			return nil, err
+		}
+		// task config should have one key, which is the task name
+		for k, _ := range m {
+			taskName = k
+			break
+		}
+
+		tm, err := taskcfg.Map(taskName)
+		if err != nil {
+			return nil, err
+		}
+
+		taskVars = vars.NewFromMap(tm)
+
+		// Parse all conditions like 'success', 'fail', etc for this task
+		for k, _ := range tm {
+			cond, err := parseCondition(k, taskcfg)
+			if err != nil {
+				if err, ok := err.(KeyError); ok {
+					// KeyError simply means this item is not a
+					// condition
+					continue
+				} else {
+					return nil, err
+				}
+			}
+			taskConds = append(taskConds, cond)
+		}
+
+		tsk := task.New(taskName)
+		seq.Add(tsk, taskConds, taskVars)
+	}
 	return seq, nil
 }
 

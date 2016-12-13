@@ -20,8 +20,11 @@ type Sequence struct {
 	//The sequence id of the current task
 	n int
 
-	//List of conditions corresponding to tasks in the sequence
-	conditions [][]condition.Condition
+	//List of Conditions corresponding to tasks in the sequence
+	Conditions [][]condition.Condition
+
+	// Parameters corresponding to each task in the sequence
+	taskVars []*vars.Vars
 
 	//Context shared by all requests in this sequence
 	ctx context.Context
@@ -32,7 +35,8 @@ type Sequence struct {
 func New() *Sequence {
 	s := &Sequence{
 		Tasks:      make([]task.Task, 0),
-		conditions: make([][]condition.Condition, 0),
+		Conditions: make([][]condition.Condition, 0),
+		taskVars:   make([]*vars.Vars, 0),
 	}
 	s.ctx, s.cancel = context.WithCancel(defaultContext())
 
@@ -75,13 +79,14 @@ func (s *Sequence) Completed() bool {
 //Add adds a new task to the sequence and returns the number of tasks in the
 //sequence
 // Like all Sequence methods, this is not concurrency-safe
-func (s *Sequence) Add(task task.Task, conds []condition.Condition) int {
+func (s *Sequence) Add(task task.Task, conds []condition.Condition, taskVars *vars.Vars) int {
 	if len(conds) == 0 {
 		conds = condition.Default()
 	}
 
 	s.Tasks = append(s.Tasks, task)
-	s.conditions = append(s.conditions, conds)
+	s.Conditions = append(s.Conditions, conds)
+	s.taskVars = append(s.taskVars, taskVars)
 	return s.Size()
 }
 
@@ -102,20 +107,26 @@ func (s *Sequence) executeStep(n int) error {
 			}
 		}
 	}()
-	// Step through conditions at this step, to determine whether this
-	// task should be executed
+
 	tsk := s.Tasks[n]
-	for _, cond := range s.conditions[n] {
+	// Apply vars for this task to the task's context
+	cVars := vars.FromContext(s.ctx)
+
+	taskCtx := vars.ToContext(s.Context(), cVars.Extend(s.taskVars[n]))
+
+	// Step through Conditions at this step, to determine whether this
+	// task should be executed
+	for _, cond := range s.Conditions[n] {
 		for {
 			// This for loop executes inside a single condition
-			err = cond.Check(s.ctx)
+			err = cond.Check(taskCtx)
 			switch err {
 			case nil:
 				// Only run the task if it has not yet run
 				if !runLatch {
 					//This must be a precondition
 					runLatch = true
-					err = tsk.Execute(s.ctx)
+					err = tsk.Execute(taskCtx)
 				}
 				// Regardless of whether the task was run,
 				// break out of this condition and

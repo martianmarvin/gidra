@@ -41,7 +41,7 @@ var (
 	cfgInputs    = "inputs"
 	cfgOutput    = "output"
 	cfgIOSource  = "source"
-	cfgIOAdapter = "adapter"
+	cfgIOAdapter = "type"
 	cfgIOVars    = "as"
 )
 

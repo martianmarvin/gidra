@@ -1,11 +1,16 @@
 package datasource
 
 import (
+	"bufio"
+	"bytes"
+	"io"
 	"mime"
 	"net/url"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/valyala/fasthttp"
 )
 
 // Finds extension from MIME type. Returns empty string if none found.
@@ -41,6 +46,7 @@ func ReaderFor(format string) (ReadableTable, error) {
 			return reader, nil
 		}
 	}
+	//TODO: Custom error for unsupported type, showing the error
 	return nil, ErrUnsupportedType
 }
 
@@ -50,6 +56,7 @@ func fromFile(fp, format string) (ReadableTable, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	f, err := os.Open(fp)
 	if err != nil {
 		return nil, err
@@ -90,4 +97,41 @@ func FromURL(u *url.URL) (ReadableTable, error) {
 	} else {
 		return fromURL(u)
 	}
+}
+
+// ReadLines is a helper that reads lines into a string slice from a local or
+// remote resource
+func ReadLines(path string) ([]string, error) {
+	var lines []string
+	var err error
+	var f io.Reader
+
+	// Parse to url to determine local or remote
+	u, err := url.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+	if len(u.Host) < 2 {
+		// Must just have path, and be a local file
+		f, err = os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		_, body, err := fasthttp.Get(nil, path)
+		if err != nil {
+			return nil, err
+		}
+		f = bytes.NewReader(body)
+	}
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return lines, nil
 }

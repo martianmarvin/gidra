@@ -25,7 +25,7 @@ var (
 )
 
 func init() {
-	Logger = log.Logger()
+	Logger = log.Logger().WithField("task", "gidra.parser")
 }
 
 // For returns the registered parser function for that key, and nil, false if it
@@ -54,7 +54,7 @@ func Register(key string, fn ParseFunc) {
 	if _, dup := configParsers[key]; dup {
 		panic("Register called twice for parser " + key)
 	}
-	configParsers[key] = fn
+	configParsers[key] = wrapParser(key, fn)
 }
 
 // Configure parses a config and applies it to the ScriptOptions
@@ -96,4 +96,28 @@ func Configure(s *options.ScriptOptions, cfg *config.Config) error {
 	}
 
 	return nil
+}
+
+// Wraps a ParseFunc to add better error reporting, logging, etc
+func wrapParser(key string, fn ParseFunc) ParseFunc {
+	return func(s *options.ScriptOptions, cfg *config.Config) error {
+		err := fn(s, cfg)
+
+		if err == nil {
+			return err
+		}
+		entry := Logger.WithField("type", "Unknown").WithField("key", key)
+		switch err := err.(type) {
+		case FieldError:
+			entry = entry.WithField("type", "FieldError").WithField("field", err.Name)
+		case KeyError:
+			entry = entry.WithField("type", "KeyError").WithField("key", err.Name)
+		case ValueError:
+			entry = entry.WithField("type", "ValueError").WithField("value", err.Name)
+		}
+		entry.Error(err)
+
+		return err
+	}
+
 }

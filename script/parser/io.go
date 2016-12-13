@@ -17,7 +17,7 @@ func init() {
 }
 
 func inputParser(s *options.ScriptOptions, cfg *config.Config) error {
-	inputs, err := cfg.MapList(cfgInputs)
+	inputs, err := cfg.MapList("")
 	if err != nil {
 		// No inputs, create NopReader
 		readers := make(map[string]datasource.ReadableTable)

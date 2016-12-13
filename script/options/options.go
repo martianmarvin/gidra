@@ -45,3 +45,16 @@ type ScriptOptions struct {
 	// Sequence to run after the main loop
 	AfterSequence *sequence.Sequence
 }
+
+// New initializes an empty set of options
+func New() *ScriptOptions {
+	return &ScriptOptions{
+		HTTP: &HTTPOptions{
+			Headers: make(map[string]string),
+			Params:  make(map[string]string),
+			Cookies: make(map[string]string),
+		},
+		Vars:  vars.New(),
+		Input: make(map[string]datasource.ReadableTable),
+	}
+}
