@@ -13,7 +13,7 @@ import (
 	"github.com/martianmarvin/conn"
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/fastcookiejar"
-	"github.com/martianmarvin/gidra/script/options"
+	"github.com/martianmarvin/gidra/script/options/http"
 	"github.com/valyala/fasthttp"
 )
 
@@ -28,7 +28,7 @@ var defaultTimeout time.Duration = 15 * time.Second
 
 type Client struct {
 	// Options are globally applied to each request by the client
-	Options *options.HTTPOptions
+	Options *http.Options
 
 	// The underlying connection
 	conn net.Conn
@@ -72,7 +72,7 @@ func New() *Client {
 		dialer:    conn.NewDialer(),
 		jar:       fastcookiejar.New(),
 		responses: make([]*fasthttp.Response, 0),
-		Options: &options.HTTPOptions{
+		Options: &http.Options{
 			Timeout: defaultTimeout,
 		},
 	}
@@ -82,7 +82,7 @@ func New() *Client {
 }
 
 // WithOptions applies settings from the Options struct to this client
-func (c *Client) WithOptions(opts *options.HTTPOptions) *Client {
+func (c *Client) WithOptions(opts *http.Options) *Client {
 	mergo.MergeWithOverwrite(c.Options, opts)
 	// Add cookies to jar for all domains
 	c.jar.SetMap(".", c.Options.Cookies)

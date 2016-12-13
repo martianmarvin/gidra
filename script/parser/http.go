@@ -8,6 +8,7 @@ import (
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/script/options"
+	"github.com/martianmarvin/gidra/script/options/http"
 	"github.com/valyala/fasthttp"
 )
 
@@ -26,8 +27,8 @@ func httpParser(s *options.ScriptOptions, cfg *config.Config) error {
 }
 
 // Parses http options from config
-func ParseHTTP(cfg *config.Config) (*options.HTTPOptions, error) {
-	opts := &options.HTTPOptions{
+func ParseHTTP(cfg *config.Config) (*http.Options, error) {
+	opts := &http.Options{
 		FollowRedirects: cfg.UBool(cfgHTTPFollowRedirects),
 		Headers:         make(map[string]string),
 		Cookies:         make(map[string]string),

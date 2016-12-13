@@ -110,8 +110,7 @@ func (s *Sequence) executeStep(n int) error {
 
 	tsk := s.Tasks[n]
 	// Apply vars for this task to the task's context
-	cVars := vars.FromContext(s.ctx)
-
+	cVars := vars.FromContext(s.Context())
 	taskCtx := vars.ToContext(s.Context(), cVars.Extend(s.taskVars[n]))
 
 	// Step through Conditions at this step, to determine whether this

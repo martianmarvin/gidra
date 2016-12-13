@@ -1,4 +1,4 @@
-package options
+package http
 
 import (
 	"time"
@@ -6,8 +6,8 @@ import (
 	"github.com/martianmarvin/gidra/client"
 )
 
-// HTTPOptions are defaults that are shared by all HTTP clients
-type HTTPOptions struct {
+// Options are defaults that are shared by all HTTP clients
+type Options struct {
 	URL *client.URLList
 
 	FollowRedirects bool

@@ -6,7 +6,9 @@ import (
 	"context"
 
 	"github.com/martianmarvin/gidra/client"
+	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/datasource"
+	"github.com/martianmarvin/vars"
 )
 
 // Context
@@ -24,6 +26,9 @@ type Global struct {
 	// Vars are all variables available to the user
 	Vars map[string]interface{}
 
+	// Proxy represents the proxy list used by the task
+	Proxy *client.URLList
+
 	// Page is the page requested by the last request
 	Page *client.Page
 
@@ -39,6 +44,7 @@ func New() *Global {
 	return &Global{
 		Vars:   make(map[string]interface{}),
 		Inputs: make(map[string]datasource.ReadableTable),
+		Proxy:  client.NewURLList(),
 		Page:   client.NewPage(),
 	}
 }
@@ -55,5 +61,14 @@ func FromContext(ctx context.Context) *Global {
 	if !ok {
 		g = New()
 	}
+
+	g.Vars = vars.FromContext(ctx).Map()
+	if client, ok := httpclient.FromContext(ctx); ok {
+		page, err := client.Page()
+		if err == nil {
+			g.Page = page
+		}
+	}
+
 	return g
 }

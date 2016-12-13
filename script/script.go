@@ -15,6 +15,7 @@ import (
 	"github.com/martianmarvin/gidra/script/options"
 	"github.com/martianmarvin/gidra/script/parser"
 	"github.com/martianmarvin/gidra/sequence"
+	"github.com/martianmarvin/vars"
 )
 
 var Logger = log.Logger()
@@ -143,17 +144,37 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 		ctx = httpclient.ToContext(ctx, client)
 	}
 
+	// Variables
+	if opts.Vars != nil {
+		ctx = vars.ToContext(ctx, opts.Vars)
+	} else {
+		ctx = vars.ToContext(ctx, vars.New())
+	}
+
 	// Template Globals
-	g := global.New()
+	g := configureGlobal(global.New(), opts)
+	ctx = global.ToContext(ctx, g)
+
+	return ctx
+}
+
+// Configure builds globals from the provided options
+func configureGlobal(g *global.Global, opts *options.ScriptOptions) *global.Global {
+	if opts == nil {
+		panic("global: Options must not be nil")
+	}
+
 	if opts.Vars != nil {
 		g.Vars = opts.Vars.Map()
+	}
+
+	if opts.HTTP.Proxy != nil {
+		g.Proxy = opts.HTTP.Proxy
 	}
 
 	if len(opts.Input) > 0 {
 		g.Inputs = opts.Input
 	}
 
-	ctx = global.ToContext(ctx, g)
-
-	return ctx
+	return g
 }
