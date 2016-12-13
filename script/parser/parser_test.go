@@ -56,6 +56,11 @@ func TestParser(t *testing.T) {
 	assert.NotNil(testproxy, "http.proxy")
 	assert.NotEmpty(testproxy.Scheme, "http.proxy")
 
+	// Global Vars
+	gvars, err := cfg.StringMap(cfgVars)
+	assert.NoError(err, "vars")
+	assert.Equal(len(gvars), len(opts.Vars.Map()))
+
 	//Sequence Templates
 	subcfgs := make([][]*config.Config, 3)
 	subcfgs[0], _ = cfg.CList(cfgSeqBefore)

@@ -12,7 +12,7 @@ import (
 // - seconds number of seconds to sleep
 
 func init() {
-	task.Register("sleep", NewTask)
+	task.Register("sleep", New)
 }
 
 type Task struct {
@@ -26,7 +26,7 @@ type Config struct {
 	Duration time.Duration `task:"seconds,required"`
 }
 
-func NewTask() task.Task {
+func New() task.Task {
 	t := &Task{
 		Config: &Config{},
 		Worker: task.NewWorker(),
