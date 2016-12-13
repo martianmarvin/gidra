@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/martianmarvin/gidra/template"
+	"github.com/martianmarvin/gidra/global"
 	"github.com/martianmarvin/vars"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,9 +23,9 @@ func testCondition(t *testing.T, cond Condition, errT, errF error) {
 	var err error
 	assert := assert.New(t)
 
-	g := template.NewGlobal()
+	g := global.New()
 	g.Vars = vars.NewFromMap(cvars).Map()
-	ctx := template.GlobalToContext(context.Background(), g)
+	ctx := global.ToContext(context.Background(), g)
 
 	for _, tmpl := range trueTmpl {
 		err = cond.Parse(tmpl)

@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/global"
 	gtemplate "github.com/martianmarvin/gidra/template"
 )
 
@@ -153,7 +154,7 @@ func (c *condition) isMet(data interface{}) bool {
 
 // Common checker, determines what from context gets passed to isMet
 func (c *condition) check(ctx context.Context) bool {
-	return c.isMet(gtemplate.GlobalFromContext(ctx))
+	return c.isMet(global.FromContext(ctx))
 
 }
 

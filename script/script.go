@@ -10,11 +10,11 @@ import (
 	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
+	"github.com/martianmarvin/gidra/global"
 	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/script/options"
 	"github.com/martianmarvin/gidra/script/parser"
 	"github.com/martianmarvin/gidra/sequence"
-	"github.com/martianmarvin/gidra/template"
 )
 
 var Logger = log.Logger()
@@ -144,7 +144,7 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	}
 
 	// Template Globals
-	g := template.NewGlobal()
+	g := global.New()
 	if opts.Vars != nil {
 		g.Vars = opts.Vars.Map()
 	}
@@ -153,7 +153,7 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 		g.Inputs = opts.Input
 	}
 
-	ctx = template.GlobalToContext(ctx, g)
+	ctx = global.ToContext(ctx, g)
 
 	return ctx
 }

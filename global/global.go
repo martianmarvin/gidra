@@ -1,4 +1,6 @@
-package template
+// Package global represents global objects available to the end-user in
+// their tasks and templates
+package global
 
 import (
 	"context"
@@ -28,28 +30,30 @@ type Global struct {
 	// Status of the last executed task
 	Status int
 
+	// Inputs are the user-defined datasources
 	Inputs map[string]datasource.ReadableTable
 }
 
-// NewGlobal instantiates a new Global object
-func NewGlobal() *Global {
+// New instantiates a new Global object
+func New() *Global {
 	return &Global{
 		Vars:   make(map[string]interface{}),
 		Inputs: make(map[string]datasource.ReadableTable),
+		Page:   client.NewPage(),
 	}
 }
 
 // ToContext saves the Global in the context
-func GlobalToContext(ctx context.Context, g *Global) context.Context {
+func ToContext(ctx context.Context, g *Global) context.Context {
 	return context.WithValue(ctx, ctxGlobal, g)
 }
 
 // FromContext retrieves the Global from the context, or a new one if one does
 // not exist
-func GlobalFromContext(ctx context.Context) *Global {
+func FromContext(ctx context.Context) *Global {
 	g, ok := ctx.Value(ctxGlobal).(*Global)
 	if !ok {
-		g = NewGlobal()
+		g = New()
 	}
 	return g
 }
