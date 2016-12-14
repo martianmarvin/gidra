@@ -1,6 +1,7 @@
 package template
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -65,6 +66,7 @@ func nextRow(r datasource.ReadableTable) *datasource.Row {
 	return row
 }
 
+// TODO: Fix InterfaceSlice
 func pickRand(list []interface{}) interface{} {
 	return list[rand.Intn(len(list))]
 }
@@ -81,8 +83,13 @@ func strEq(a, b interface{}) bool {
 	return fmt.Sprint(a) == fmt.Sprint(b)
 }
 
-func runShell(cmd string) (string, error) {
-	out, err := exec.Command(cmd).Output()
+func runShell(args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", errors.New("Command is required as first argument")
+	}
+	cmd := args[0]
+	args = args[1:]
+	out, err := exec.Command(cmd, args...).Output()
 	if err != nil {
 		return "", err
 	}

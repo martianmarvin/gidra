@@ -49,6 +49,20 @@ func New() *Global {
 	}
 }
 
+// Copy returns a shallow copy of the Global
+func (g *Global) Copy() *Global {
+	g2 := New()
+	for k, v := range g.Vars {
+		g2.Vars[k] = v
+	}
+	for k, v := range g.Inputs {
+		g2.Inputs[k] = v
+	}
+	*g2.Proxy = *g.Proxy
+	*g2.Page = *g.Page
+	return g2
+}
+
 // ToContext saves the Global in the context
 func ToContext(ctx context.Context, g *Global) context.Context {
 	return context.WithValue(ctx, ctxGlobal, g)

@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+
+	"github.com/martianmarvin/gidra/global"
 )
 
 var (
@@ -72,12 +74,52 @@ func New(tmpl string) (*template.Template, error) {
 	return template.New("").Option("missingkey=zero").Funcs(funcMap).Parse(tmpl)
 }
 
-// Execute executes the provided template and returns the result
-func Execute(t *template.Template, data interface{}) (string, error) {
+func execute(t *template.Template, data interface{}) (string, error) {
 	var b bytes.Buffer
 	err := t.Execute(&b, data)
 	if err != nil {
 		return "", err
 	}
 	return b.String(), err
+}
+
+// Execute executes the provided template and returns the result
+func Execute(t *template.Template, data interface{}) (string, error) {
+	tdata, err := evalVals(data)
+	if err != nil {
+		return "", err
+	}
+	return execute(t, tdata)
+}
+
+// Execute a string template
+func eval(v string, data interface{}) (string, error) {
+	if validTmpl(v) {
+		tmpl, err := New(v)
+		if err != nil {
+			return "", err
+		}
+		return execute(tmpl, data)
+	} else {
+		return v, nil
+	}
+}
+
+// Recursively execute nested template values in vars
+func evalVals(data interface{}) (interface{}, error) {
+	if g, ok := data.(*global.Global); ok {
+		g2 := g.Copy()
+		for k, v := range g2.Vars {
+			if val, ok := v.(string); ok {
+				val, err := eval(val, g2)
+				if err != nil {
+					return nil, err
+				}
+				g2.Vars[k] = val
+			}
+		}
+		return g2, nil
+	} else {
+		return data, nil
+	}
 }
