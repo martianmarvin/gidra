@@ -115,10 +115,10 @@ func evalVals(data interface{}) (interface{}, error) {
 				if err != nil {
 					return nil, err
 				}
-				g2.Vars[k] = val
+				g.Vars[k] = val
 			}
 		}
-		return g2, nil
+		return g, nil
 	} else {
 		return data, nil
 	}
