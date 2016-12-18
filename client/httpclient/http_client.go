@@ -76,7 +76,9 @@ func New() *Client {
 			Timeout: defaultTimeout,
 		},
 	}
-	c.dialer.Proxy, _ = c.Options.Proxy.Current()
+	if c.Options.Proxy != nil {
+		c.dialer.Proxy, _ = c.Options.Proxy.Current()
+	}
 	c.client.Dial = c.dialer.FastDial
 	return c
 }
@@ -92,11 +94,15 @@ func (c *Client) WithOptions(opts *http.Options) *Client {
 
 func (c *Client) Dial(addr string) (net.Conn, error) {
 	var err error
-	prox, err := c.Options.Proxy.Current()
-	if err != nil {
-		return nil, err
+	if c.Options.Proxy != nil {
+		prox, err := c.Options.Proxy.Current()
+		if err != nil {
+			return nil, err
+		}
+		c.conn, err = c.dialer.Dial(addr, prox)
+	} else {
+		c.conn, err = c.dialer.Dial(addr, nil)
 	}
-	c.conn, err = c.dialer.Dial(addr, prox)
 	return c.conn, err
 }
 

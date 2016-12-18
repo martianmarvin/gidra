@@ -3,7 +3,9 @@ package http
 import (
 	"context"
 	"errors"
+	"net/url"
 
+	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/valyala/fasthttp"
@@ -23,7 +25,7 @@ type Task struct {
 type Config struct {
 	Method []byte
 
-	URL string `task:"url,required"`
+	URL *url.URL `task:"url,required"`
 
 	Headers map[string]string
 
@@ -32,6 +34,10 @@ type Config struct {
 	Params map[string]string
 
 	Body []byte
+
+	FollowRedirects bool
+
+	Proxy *client.URLList
 }
 
 func (t *Task) Execute(ctx context.Context) (err error) {
@@ -44,6 +50,9 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 
 	req := t.buildRequest()
 
+	c.Options.FollowRedirects = t.Config.FollowRedirects
+	c.Options.Proxy = t.Config.Proxy
+
 	err = c.Do(req)
 
 	return err
@@ -53,10 +62,14 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 func (t *Task) buildRequest() (req *fasthttp.Request) {
 	req = fasthttp.AcquireRequest()
 	req.Header.SetMethodBytes(t.Config.Method)
-	req.SetRequestURI(t.Config.URL)
+	req.SetRequestURI(t.Config.URL.String())
 
 	for k, v := range t.Config.Headers {
 		req.Header.Set(k, v)
+	}
+
+	for k, v := range t.Config.Cookies {
+		req.Header.SetCookie(k, v)
 	}
 
 	if len(t.Config.Params) == 0 && len(t.Config.Body) > 0 {
@@ -72,4 +85,11 @@ func (t *Task) buildRequest() (req *fasthttp.Request) {
 	}
 
 	return req
+}
+
+func (t *Task) String() string {
+	if len(t.Config.Method) == 0 || t.Config.URL == nil {
+		return "http - <nil>"
+	}
+	return t.buildRequest().String()
 }

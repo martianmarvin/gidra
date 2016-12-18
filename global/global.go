@@ -8,7 +8,6 @@ import (
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/datasource"
-	"github.com/martianmarvin/vars"
 )
 
 // Context
@@ -76,7 +75,6 @@ func FromContext(ctx context.Context) *Global {
 		g = New()
 	}
 
-	g.Vars = vars.FromContext(ctx).Map()
 	if client, ok := httpclient.FromContext(ctx); ok {
 		page, err := client.Page()
 		if err == nil {

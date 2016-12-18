@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/andybalholm/cascadia"
@@ -39,11 +40,17 @@ type Config struct {
 
 	//Key to save match in, if any
 	Key string `task:"as"`
+
+	// The text to extract from
+	Text []byte
+
+	// Whether to strip leading and trailing spaces from extracted value
+	TrimSpace bool `task:"trim"`
 }
 
 func NewTask() task.Task {
 	t := &Task{
-		Config: &Config{},
+		Config: &Config{TrimSpace: true},
 		Worker: task.NewWorker(),
 	}
 	t.Configurable = task.NewConfigurable(t.Config)
@@ -122,6 +129,7 @@ func extractByElement(matcher cascadia.Selector, text []byte) []string {
 func (t *Task) Execute(ctx context.Context) (err error) {
 	var results []string
 	var rk string
+	var text []byte
 
 	if len(t.Config.Key) > 0 {
 		rk = t.Config.Key
@@ -137,15 +145,21 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 	taskVars := vars.FromContext(ctx)
 	extracted := taskVars.Get(rk).MustStringArray()
 
-	client, ok := client.FromContext(ctx)
-	if !ok {
-		return errors.New("No client to extract from, make an http request first")
+	// If no text is provided, default to the last response from the client
+	if len(t.Config.Text) > 0 {
+		text = t.Config.Text
+	} else {
+		client, ok := client.FromContext(ctx)
+		if !ok {
+			return errors.New("No client to extract from, make an http request first")
+		}
+
+		text, err = client.Response()
+		if err != nil {
+			return err
+		}
 	}
 
-	text, err := client.Response()
-	if err != nil {
-		return err
-	}
 	if len(text) == 0 {
 		return errors.New("Response text is empty, nothing to extract")
 	}
@@ -169,6 +183,9 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 	}
 
 	for _, res := range results {
+		if t.Config.TrimSpace {
+			res = strings.TrimSpace(res)
+		}
 		extracted = append(extracted, res)
 	}
 	taskVars.SetPath(rk, extracted)

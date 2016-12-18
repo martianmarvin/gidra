@@ -39,9 +39,9 @@ func initLogger() {
 }
 
 // SetLevel sets the global log level
-func SetLevel(lvl logrus.Level) {
+func SetLevel(lvl int) {
 	if lvl > 0 && lvl <= 5 {
-		logrus.SetLevel(lvl)
+		logrus.SetLevel(logrus.Level(lvl))
 	}
 }
 

@@ -9,16 +9,6 @@ var (
 	cfgConfigVerbosity   = "verbosity"
 	cfgConfigTaskTimeout = "task_timeout"
 
-	// HTTP Client Options
-	cfgHTTP                = "http"
-	cfgHTTPFollowRedirects = "follow_redirects"
-	cfgHTTPCookies         = "cookies"
-	cfgHTTPHeaders         = "headers"
-	cfgHTTPTimeout         = "timeout"
-	cfgHTTPProxy           = "proxy"
-	cfgHTTPParams          = "params"
-	cfgHTTPBody            = "body"
-
 	//Global variablies
 	cfgVars = "vars"
 

@@ -3,10 +3,11 @@ package script
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
@@ -26,6 +27,9 @@ var Logger = log.Logger()
 type Script struct {
 	Options *options.ScriptOptions
 
+	// All sequences loaded for this script
+	sequences []*sequence.Sequence
+
 	// The queue of sequences to execute
 	queue chan *sequence.Sequence
 
@@ -36,14 +40,14 @@ type Script struct {
 // New initializes a new Script
 func New() *Script {
 	return &Script{
-		queue: make(chan *sequence.Sequence, 1),
+		Options: options.New(),
+		results: make(chan *sequence.Result),
 	}
 }
 
 // Open reads a script file and Loads it into a script instance
-func Open(name string) (*Script, error) {
-	f, err := os.Open(name)
-	cfg, err := config.ParseYaml(f)
+func Open(r io.Reader) (*Script, error) {
+	cfg, err := config.ParseYaml(r)
 	if err != nil {
 		return nil, err
 	}
@@ -55,13 +59,38 @@ func Open(name string) (*Script, error) {
 	return s, nil
 }
 
-// Load loads a script file and initializes Sequences
-func (s *Script) Load(cfg *config.Config) (err error) {
+// OpenFile reads a script from a file
+func OpenFile(fn string) (*Script, error) {
+	f, err := os.Open(fn)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-	//Parse yaml script
+	return Open(f)
+}
+
+// Load loads a script file and initializes Sequences
+func (s *Script) Load(cfg *config.Config) error {
+	var err error
+
+	// Parse yaml script and merge with default config
+	cfg, err = config.Default().Extend(cfg)
+	if err != nil {
+		return err
+	}
 	err = parser.Configure(s.Options, cfg)
 	if err != nil {
 		return err
+	}
+
+	// Buffer queue for concurrency
+	s.queue = make(chan *sequence.Sequence, s.Options.Threads)
+
+	// If no inputs, create NopReader
+	if len(s.Options.Input) == 0 {
+		s.Options.Input = make(map[string]datasource.ReadableTable)
+		s.Options.Input["main"] = datasource.NewNopReader(s.Options.Loop)
 	}
 
 	ctx := configureContext(context.Background(), s.Options)
@@ -74,9 +103,20 @@ func (s *Script) Load(cfg *config.Config) (err error) {
 		return errors.New("Could not parse task list")
 	}
 
-	for i := 0; i <= s.Options.Loop; i++ {
-		s.Add(s.Options.MainSequence.WithContext(ctx))
+	iter := s.Options.Input["main"]
+	for {
+		row, err := iter.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		seq := s.Options.MainSequence.WithContext(ctx)
+		seq.Row = row
+		seq.Id = int(row.Index)
+		s.Add(seq)
 	}
+	iter.Close()
 
 	if seq := s.Options.AfterSequence; seq != nil {
 		s.Add(seq.WithContext(ctx))
@@ -87,16 +127,13 @@ func (s *Script) Load(cfg *config.Config) (err error) {
 
 // Add adds a new sequence to the Script's queue
 func (s *Script) Add(seq *sequence.Sequence) {
-	go func() {
-		s.queue <- seq
-	}()
+	s.sequences = append(s.sequences, seq)
 }
 
 // Run runs all of the script's sequences
 // Once Run has been called on the script, no new sequences can be added, and
 // it should not be called again.
 func (s *Script) Run() {
-	close(s.queue)
 	var wg sync.WaitGroup
 	results := make(chan *sequence.Result)
 	go resultProcessor(results, s.Options.Output)
@@ -111,6 +148,27 @@ func (s *Script) Run() {
 		Logger.Info("All Workers Done")
 		close(results)
 	}()
+}
+
+// Goroutine that pops sequences and adds them to the queue
+func (s *Script) enqueue() {
+	for _, seq := range s.sequences {
+		s.queue <- seq
+	}
+	close(s.queue)
+	s.sequences = make([]*sequence.Sequence, 0)
+}
+
+// DryRun prints the tasks that would be executed by the script if it ran to
+// the given io.Writer, but
+// does not actually run any of them
+func (s *Script) DryRun(w io.Writer) {
+	n := (int(s.Options.Input["main"].Len()) * s.Options.MainSequence.Size())
+	fmt.Fprintf(w, "DRY RUN %d tasks\n", n)
+	go s.enqueue()
+	for seq := range s.queue {
+		fmt.Fprint(w, seq)
+	}
 }
 
 // Goroutine worker that runs sequences and returns results
@@ -135,7 +193,7 @@ func resultProcessor(results <-chan *sequence.Result, output datasource.Writeabl
 // Instantiates context with global objects based on options
 func configureContext(ctx context.Context, opts *options.ScriptOptions) context.Context {
 	// Log
-	log.SetLevel(logrus.Level(opts.Verbosity))
+	log.SetLevel(opts.Verbosity)
 	ctx = log.ToContext(ctx, log.Logger())
 
 	// HTTP Client
@@ -145,11 +203,25 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	}
 
 	// Variables
+	scriptVars := vars.New()
 	if opts.Vars != nil {
-		ctx = vars.ToContext(ctx, opts.Vars)
-	} else {
-		ctx = vars.ToContext(ctx, vars.New())
+		scriptVars = opts.Vars.Copy()
 	}
+
+	// Save user-defined options as vars so they can be modified during
+	// script execution
+	// TODO Refactor to more modular approach to passing task vars
+	scriptVars.Set("task_timeout", opts.TaskTimeout)
+	scriptVars.Set("verbosity", opts.Verbosity)
+
+	scriptVars.Set("follow_redirects", opts.HTTP.FollowRedirects)
+	scriptVars.Set("proxy", opts.HTTP.Proxy)
+	scriptVars.Set("headers", opts.HTTP.Headers)
+	scriptVars.Set("params", opts.HTTP.Params)
+	scriptVars.Set("cookies", opts.HTTP.Cookies)
+	scriptVars.Set("body", opts.HTTP.Body)
+
+	ctx = vars.ToContext(ctx, scriptVars)
 
 	// Template Globals
 	g := configureGlobal(global.New(), opts)

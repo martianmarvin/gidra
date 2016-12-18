@@ -4,16 +4,17 @@ config:
   task_timeout: 15
   loop: 10
 
-http:
-  follow_redirects: false
-  headers:
-    user-agent: Mozilla/5.0 (Windows NT 6.1; rv:45.0) Gecko/20100101 Firefox/45.0
-    accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
-    accept-language: en-US,en;q=0.5
-    accept-encoding: gzip, deflate
-  proxy:
-    type: socks5
-    source: ./test/proxies.txt
+default:
+  http: &http
+    followRedirects: false
+    headers:
+      user-agent: Mozilla/5.0 (Windows NT 6.1; rv:45.0) Gecko/20100101 Firefox/45.0
+      accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+      accept-language: en-US,en;q=0.5
+      accept-encoding: gzip, deflate
+    proxy:
+      type: socks5
+      source: ./test/proxies.txt
 
 vars:
   host: https://www.example.com
@@ -38,6 +39,7 @@ before:
 
 tasks:
   - get:
+      <<: *http
       url: '{{ .Vars.host }}'
       success:
         when: '{{ eq .Page.Status 200 }}'
@@ -45,6 +47,7 @@ tasks:
       regex: 'csrf_token="(.*)"'
       as: csrf_token
   - post:
+      <<: *http
       url: '{{ .Vars.host }}/login'
       headers:
         referer: http://www.example.com
@@ -67,6 +70,7 @@ tasks:
       element: "div.user>span.id"
       as: user_id
   - get:
+      <<: *http
       url: https://www.example.com/account
       success: 'eq .Page.Title "Account"'
 

@@ -33,10 +33,9 @@ func testCondition(t *testing.T, cond Condition, errT, errF error) {
 
 		err = cond.Check(ctx)
 		if errT == nil {
-			// assert.NoError(err, tmpl, fmt.Sprint(g.Vars))
-			assert.NoError(err, fmt.Sprint(tmpl), fmt.Sprint(g.Vars))
+			assert.NoError(err, tmpl)
 		} else {
-			assert.EqualError(err, errT.Error(), tmpl, fmt.Sprint(g.Vars))
+			assert.EqualError(err, errT.Error(), tmpl)
 		}
 	}
 

@@ -2,11 +2,11 @@ package task
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/log"
-	"github.com/martianmarvin/vars"
 )
 
 var (
@@ -37,29 +37,23 @@ func (t *task) Execute(ctx context.Context) error {
 	}
 
 	// Read global config
+	// TODO refactor to avoid using config
 	cfg := config.FromContext(ctx)
-	timeout := time.Duration(cfg.UInt(cfgTimeout, 0)) * time.Second
-	if timeout < time.Second {
+	timeout, err := cfg.Duration(cfgTimeout)
+	if err != nil || timeout < time.Second {
 		timeout = defaultTimeout
 	}
 
 	ctx = log.ToContext(ctx, t.logger)
-
-	if l, ok := t.task.(Loggable); ok {
-		l.SetLogger(t.logger)
-	}
-
-	// Populate task's config
-	if c, ok := t.task.(Configurable); ok {
-		err = configureTask(ctx, c)
-		if err != nil {
-			t.logger.Error(err)
-			return err
-		}
-	}
-
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	// Apply this context to task
+	err = t.configure(ctx)
+	if err != nil {
+		t.logger.Error(err)
+		return err
+	}
 
 	// Execute task supporting cancellation via context
 	done := make(chan error)
@@ -83,6 +77,29 @@ func (t *task) Execute(ctx context.Context) error {
 
 }
 
-func configureTask(ctx context.Context, t Configurable) error {
-	return t.Configure(vars.FromContext(ctx))
+// Print the task configured with the given context
+func (t *task) show(ctx context.Context) string {
+	var fields string
+	t.configure(ctx)
+	if c, ok := t.task.(Configurable); ok {
+		fields = c.String()
+	}
+	return fmt.Sprintf("%s: %s", t.name, fields)
+}
+
+func (t *task) configure(ctx context.Context) error {
+	if l, ok := t.task.(Loggable); ok {
+		l.SetLogger(t.logger)
+	}
+
+	// Populate task's config
+	cfg := config.FromContext(ctx)
+	log.Logger().Warn(cfg.Map(""))
+	if c, ok := t.task.(Configurable); ok {
+		err := c.Configure(config.FromContext(ctx))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

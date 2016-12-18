@@ -20,22 +20,6 @@ const (
 	ctxConfig contextKey = iota
 )
 
-// Default config. Overridden from script file or environment
-var defaultConfig = `
-config:
-	verbosity: 4
-	threads: 100
-	loop: 1
-	task_timeout: 15
-http:
-	follow_redirects: false
-	headers:
-		user-agent: Mozilla/5.0 (Windows NT 6.1; rv:45.0) Gecko/20100101 Firefox/45.0
-		accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
-		accept-language: en-US,en;q=0.5
-		accept-encoding: gzip, deflate
-`
-
 // The default top level config object
 var cfg *Config
 
@@ -49,6 +33,16 @@ func New() *Config {
 	return &Config{
 		Config: &config.Config{},
 	}
+}
+
+// Extend merges the new config with this one
+func (cfg *Config) Extend(newcfg *Config) (*Config, error) {
+	c, err := cfg.Config.Extend(newcfg.Config)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Config = c
+	return cfg, nil
 }
 
 // Get returns the config at path, or the default if not found
@@ -252,18 +246,22 @@ func Default() *Config {
 
 // ToContext returns a context with the provided config merged into the one in
 // the context
-func ToContext(ctx context.Context, c *Config) context.Context {
-	old := FromContext(ctx)
-	merged := config.Must(old.Extend(c.Config))
-	return context.WithValue(ctx, ctxConfig, merged)
+func ToContext(ctx context.Context, cfg *Config) context.Context {
+	return context.WithValue(ctx, ctxConfig, cfg)
 }
 
-// FromContext returns a config from the context, or the default if the context
+// FromContext returns a config from the context, or an empty config if the context
 // does not have one
 func FromContext(ctx context.Context) *Config {
 	if c, ok := ctx.Value(ctxConfig).(*Config); ok {
 		return c
 	} else {
-		return Default()
+		return New()
 	}
+}
+
+// ToString implements the Stringer interface
+func (cfg *Config) ToString() string {
+	s, _ := config.RenderYaml(cfg.Config.Root)
+	return s
 }

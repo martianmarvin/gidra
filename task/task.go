@@ -4,7 +4,9 @@ package task
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -66,7 +68,8 @@ func New(action string) Task {
 	defer tasksMu.RUnlock()
 	fn, ok := registeredTasks[action]
 	if !ok {
-		panic("No such task: " + action)
+		avail := Tasks()
+		panic(fmt.Sprintf("No such task:%s. %d available tasks: %s", action, len(avail), strings.Join(avail, ",")))
 	}
 	t := fn()
 
@@ -74,6 +77,14 @@ func New(action string) Task {
 	t = &task{task: t, name: action}
 
 	return t
+}
+
+// Show returns the task as a string, configured with the context
+func Show(ctx context.Context, t Task) string {
+	if tsk, ok := t.(*task); ok {
+		return tsk.show(ctx)
+	}
+	return ""
 }
 
 // Run runs a task immediately, out of sequence

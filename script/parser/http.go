@@ -4,127 +4,65 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
-	"github.com/martianmarvin/gidra/script/options"
-	"github.com/martianmarvin/gidra/script/options/http"
-	"github.com/valyala/fasthttp"
 )
 
-func init() {
-	Register(cfgHTTP, httpParser)
-}
-
-func httpParser(s *options.ScriptOptions, cfg *config.Config) error {
-	opts, err := ParseHTTP(cfg)
-	if err != nil {
-		return err
-	}
-	s.HTTP = opts
-
-	return nil
-}
-
-// Parses http options from config
-func ParseHTTP(cfg *config.Config) (*http.Options, error) {
-	opts := &http.Options{
-		FollowRedirects: cfg.UBool(cfgHTTPFollowRedirects),
-		Headers:         make(map[string]string),
-		Cookies:         make(map[string]string),
-		Params:          make(map[string]string),
-	}
-
-	headers, err := cfg.StringMap(cfgHTTPHeaders)
-	if err == nil {
-		for k, v := range headers {
-			k := normalizeHeader(k)
-			opts.Headers[k] = v
-		}
-	}
-	cookies, err := cfg.StringMap(cfgHTTPCookies)
-	if err == nil {
-		opts.Cookies = cookies
-	}
-
-	timeout, err := cfg.Duration(cfgHTTPTimeout)
-	if err == nil {
-		opts.Timeout = timeout
-	}
-
-	if proxycfg, ok := cfg.CheckGet(cfgHTTPProxy); ok {
-		fn, err := parseProxy(proxycfg)
-		if err != nil {
-			return nil, err
-		}
-		opts.Proxy = fn
-	}
-
-	body, err := cfg.String(cfgHTTPBody)
-	if err == nil {
-		opts.Body = []byte(body)
-	}
-
-	return opts, nil
-}
-
-// Proxy could be map, list, filename to read from, or url string
-func parseProxy(cfg *config.Config) (*client.URLList, error) {
+// TODO: Transparently replace a file path with a slice of results in all
+// tasks, this should be unused for now
+// URLs could be map, list, filename to read from, or url string
+func parseURLList(cfg *config.Config) (*client.URLList, error) {
 	var err error
 	l := client.NewURLList()
 
 	// URL string
-	proxy, err := cfg.URL("")
+	u, err := cfg.URL("")
 	if err == nil {
-		l.Append(proxy)
+		l.Append(u)
 		_, err = l.Next()
 		return l, err
 	}
 
 	// URL list
-	proxies, err := cfg.StringList("")
+	urls, err := cfg.StringList("")
 	if err == nil {
-		l.AppendString(proxies...)
+		l.AppendString(urls...)
 		_, err = l.Next()
 		return l, err
 	}
 
-	// Map with type and source
+	// Map with scheme and source
 	m, err := cfg.StringMap("")
 	if err == nil {
 		source, ok := m[cfgIOSource]
 		if !ok {
-			return nil, FieldError{cfgIOSource}
+			return nil, gidra.FieldError{cfgIOSource}
 		}
 		lines, err := datasource.ReadLines(source)
 		if err != nil {
 			return nil, err
 		}
-		proxyurls := make([]*url.URL, 0)
+		urls := make([]*url.URL, 0)
 		for _, line := range lines {
 			u, err := url.Parse(line)
 			if err != nil {
 				return nil, err
 			}
-			proxyurls = append(proxyurls, u)
+			urls = append(urls, u)
 		}
-		proxyType, err := cfg.String(cfgIOAdapter)
+		uType, err := cfg.String(cfgIOAdapter)
 		if err == nil {
-			proxyType = strings.ToLower(proxyType)
-			for _, u := range proxyurls {
-				u.Scheme = proxyType
+			uType = strings.ToLower(uType)
+			for _, u := range urls {
+				u.Scheme = uType
 			}
 		}
-		l.Append(proxyurls...)
+		l.Append(urls...)
 		_, err = l.Next()
 		return l, err
 	}
 
-	return nil, ValueError{Name: cfgHTTPProxy}
-}
-
-func normalizeHeader(key string) string {
-	var res []byte
-	res = fasthttp.AppendNormalizedHeaderKey(res, key)
-	return string(res)
+	return nil, gidra.ValueError{}
 }

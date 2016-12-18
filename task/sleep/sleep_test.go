@@ -2,18 +2,25 @@ package sleep
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/task"
-	"github.com/martianmarvin/vars"
 	"github.com/stretchr/testify/assert"
 )
 
+var taskCfg = `
+seconds: 5
+`
+
 func TestSleep(t *testing.T) {
+	r := strings.NewReader(taskCfg)
+	cfg := config.Must(config.ParseYaml(r))
+
 	tsk := task.New("sleep")
-	ctx := vars.ToContext(context.Background(), vars.New())
-	ctx = vars.SetCtx(ctx, "seconds", 5)
+	ctx := config.ToContext(context.Background(), cfg)
 	before := time.Now()
 	err := tsk.Execute(ctx)
 	after := time.Now()

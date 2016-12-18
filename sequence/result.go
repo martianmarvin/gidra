@@ -63,7 +63,7 @@ func (r *Result) ReadVars(taskVars *vars.Vars) []string {
 					k := fmt.Sprintf("%s.%d", key, i)
 					r.Output.AppendKV(k, v)
 				}
-			} else if m, err := taskVar.Map(); err == nil {
+			} else if m := taskVar.Map(); len(m) > 0 {
 				for k, v := range m {
 					k = fmt.Sprintf("%s.%s", key, k)
 					r.Output.AppendKV(k, v)

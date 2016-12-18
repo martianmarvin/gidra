@@ -3,6 +3,7 @@ package parser
 import (
 	"context"
 
+	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/script/options"
@@ -20,7 +21,7 @@ func init() {
 
 func beforeSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 	if s.BeforeSequence != nil {
-		return KeyError{cfgSeqBefore}
+		return gidra.KeyError{cfgSeqBefore}
 	}
 	taskList, err := cfg.CList("")
 	if err != nil {
@@ -38,7 +39,7 @@ func beforeSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 
 func mainSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 	if s.MainSequence != nil {
-		return KeyError{cfgSeqTasks}
+		return gidra.KeyError{cfgSeqTasks}
 	}
 	taskList, err := cfg.CList("")
 	if err != nil {
@@ -56,7 +57,7 @@ func mainSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 
 func afterSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 	if s.AfterSequence != nil {
-		return KeyError{cfgSeqAfter}
+		return gidra.KeyError{cfgSeqAfter}
 	}
 	taskList, err := cfg.CList("")
 	if err != nil {
@@ -78,7 +79,7 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 	for _, taskcfg := range taskList {
 		var taskName string
 		var taskConds []condition.Condition
-		var taskVars *vars.Vars
+
 		m, err := taskcfg.Map("")
 		if err != nil {
 			return nil, err
@@ -89,19 +90,22 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 			break
 		}
 
-		tm, err := taskcfg.Map(taskName)
+		// Get task sub config map
+		cfg, ok := taskcfg.CheckGet(taskName)
+		if !ok {
+			return nil, gidra.KeyError{taskName}
+		}
+		tm, err := cfg.Map("")
 		if err != nil {
 			return nil, err
 		}
-
-		taskVars = vars.NewFromMap(tm)
 
 		// Parse all conditions like 'success', 'fail', etc for this task
 		for k, _ := range tm {
 			cond, err := parseCondition(k, taskcfg)
 			if err != nil {
-				if err, ok := err.(KeyError); ok {
-					// KeyError simply means this item is not a
+				if err, ok := err.(gidra.KeyError); ok {
+					// gidra.KeyError simply means this item is not a
 					// condition
 					continue
 				} else {
@@ -112,7 +116,7 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 		}
 
 		tsk := task.New(taskName)
-		seq.Add(tsk, taskConds, taskVars)
+		seq.Add(tsk, taskConds, cfg)
 	}
 	return seq, nil
 }
@@ -141,13 +145,13 @@ func parseCondition(key string, cfg *config.Config) (condition.Condition, error)
 	case cfgTaskFailCond:
 		cond = condition.NewFail(callbacks...)
 	default:
-		return nil, KeyError{key}
+		return nil, gidra.KeyError{key}
 	}
 
 	ck := key + "." + cfgTaskCond
 	tmpl, err := cfg.String(ck)
 	if err != nil {
-		return nil, KeyError{ck}
+		return nil, gidra.KeyError{ck}
 	}
 
 	err = cond.Parse(tmpl)

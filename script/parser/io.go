@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/script/options"
@@ -19,23 +20,15 @@ func init() {
 func inputParser(s *options.ScriptOptions, cfg *config.Config) error {
 	inputs, err := cfg.MapList("")
 	if err != nil {
-		// No inputs, create NopReader
-		readers := make(map[string]datasource.ReadableTable)
-		readers["main"] = datasource.NewNopReader(s.Loop)
-		s.Input = readers
-		return nil
+		return err
 	}
 	parsed, err := parseInput(inputs)
-	if err == nil {
-		s.Input = parsed
+	if err != nil {
+		return err
 	}
-	if reader, ok := s.Input["main"]; ok {
-		l := int(reader.Len())
-		if l > 0 && (s.Loop > l || s.Loop == 0) {
-			s.Loop = l
-		}
-	}
-	return err
+	s.Input = parsed
+
+	return nil
 }
 
 // Creates an input datasource based on the config
@@ -48,7 +41,7 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 	for _, input := range inputs {
 		source, ok := input[cfgIOSource].(string)
 		if !ok || len(source) == 0 {
-			return nil, FieldError{cfgIOSource}
+			return nil, gidra.FieldError{cfgIOSource}
 		}
 
 		adapter, ok := input[cfgIOAdapter].(string)
@@ -67,7 +60,7 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 				}
 				readers["main"] = reader
 			} else {
-				return nil, FieldError{cfgIOVars}
+				return nil, gidra.FieldError{cfgIOVars}
 			}
 		} else {
 			reader, err := datasource.FromFileType(source, adapter)
@@ -102,7 +95,7 @@ func outputParser(s *options.ScriptOptions, cfg *config.Config) error {
 func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error) {
 	source, ok := output[cfgIOSource].(string)
 	if !ok || len(source) == 0 {
-		return nil, FieldError{cfgIOSource}
+		return nil, gidra.FieldError{cfgIOSource}
 	}
 
 	adapter, ok := output[cfgIOAdapter].(string)
@@ -119,7 +112,7 @@ func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error)
 	}
 
 	if writer == nil {
-		return nil, FieldError{cfgIOSource}
+		return nil, gidra.FieldError{cfgIOSource}
 	}
 
 	return outputWriter(adapter, writer)

@@ -3,6 +3,7 @@ package parser
 import (
 	"sync"
 
+	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/script/options"
@@ -83,11 +84,12 @@ func Configure(s *options.ScriptOptions, cfg *config.Config) error {
 	for _, key := range keys {
 		parser, ok := For(key)
 		if !ok {
-			return KeyError{key}
+			// No parser registered for this key, skip
+			continue
 		}
 		conf, ok := cfg.CheckGet(key)
 		if !ok {
-			return KeyError{key}
+			return gidra.KeyError{key}
 		}
 		err := parser(s, conf)
 		if err != nil {
@@ -108,11 +110,11 @@ func wrapParser(key string, fn ParseFunc) ParseFunc {
 		}
 		entry := Logger.WithField("type", "Unknown").WithField("key", key)
 		switch err := err.(type) {
-		case FieldError:
+		case gidra.FieldError:
 			entry = entry.WithField("type", "FieldError").WithField("field", err.Name)
-		case KeyError:
+		case gidra.KeyError:
 			entry = entry.WithField("type", "KeyError").WithField("key", err.Name)
-		case ValueError:
+		case gidra.ValueError:
 			entry = entry.WithField("type", "ValueError").WithField("value", err.Name)
 		}
 		entry.Error(err)
