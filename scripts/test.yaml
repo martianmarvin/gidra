@@ -1,0 +1,7 @@
+config:
+  loop: 5
+tasks:
+  - sleep:
+      seconds: 3
+  - sleep:
+      seconds: 2

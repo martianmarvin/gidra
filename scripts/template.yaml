@@ -1,3 +1,5 @@
+version: '1'
+
 config:
   verbosity: 4
   threads: 100

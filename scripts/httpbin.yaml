@@ -1,4 +1,4 @@
 tasks:
   - get:
-    url: https://www.httpbin.org/get
-    success: '.Status == 200'
+      url: https://www.httpbin.org/get
+      success: '.Status == 200'
