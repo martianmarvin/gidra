@@ -45,7 +45,7 @@ func TestLoad(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	for i, scr := range testScripts[1:] {
+	for i, scr := range testScripts {
 		msg := fmt.Sprintf("test script #%d \n%20s", i, scr)
 		var buf bytes.Buffer
 

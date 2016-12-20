@@ -21,8 +21,11 @@ func (w *WriteCloser) Close() error {
 	return w.writer.Close()
 }
 
-// Flush writes the table's data to the underlying writer
-func (w *WriteCloser) Flush() error {
-	_, err := w.WriteTo(w.writer)
-	return err
+// WriteTo writes the table's data to the specified writer, or to the underlying
+// writer if nil is provided as the argument
+func (w *WriteCloser) WriteTo(wr io.Writer) (int64, error) {
+	if wr == nil {
+		wr = w.writer
+	}
+	return w.WriteableTable.WriteTo(wr)
 }

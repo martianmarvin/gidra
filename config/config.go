@@ -36,13 +36,52 @@ func New() *Config {
 }
 
 // Extend merges the new config with this one
+// TODO Not fully recursive merge
 func (cfg *Config) Extend(newcfg *Config) (*Config, error) {
-	c, err := cfg.Config.Extend(newcfg.Config)
+	cf, err := cfg.Config.Extend(newcfg.Config)
 	if err != nil {
 		return nil, err
 	}
-	cfg.Config = c
+	cfg.Config = cf
 	return cfg, nil
+}
+
+// Recursively merge a value(map, list, etc) into the config
+// TODO Doesn't work currently, fix and simplify
+func deepMerge(cfg, newcfg *Config) (*Config, error) {
+	val := newcfg.Root
+
+	switch val := val.(type) {
+	case string, bool, int, float64:
+		cfg.Set("", val)
+		return cfg, nil
+	case map[string]interface{}:
+		for k, _ := range val {
+			m, err := deepMerge(cfg.Get(k, New()), newcfg.Get(k, New()))
+			if err != nil {
+				return cfg, err
+			}
+			err = cfg.Set(k, m)
+			if err != nil {
+				return cfg, err
+			}
+		}
+		return cfg, nil
+	case []interface{}:
+		l := make([]interface{}, len(val))
+		for i, _ := range val {
+			k := fmt.Sprintf("%d", i)
+			item, err := deepMerge(cfg.Get(k, New()), newcfg.Get(k, New()))
+			if err != nil {
+				return cfg, err
+			}
+			l[i] = item
+		}
+		err := cfg.Set("", append(cfg.UList(""), l...))
+		return cfg, err
+	default:
+		return cfg, nil
+	}
 }
 
 // Get returns the config at path, or the default if not found
@@ -158,6 +197,23 @@ func (cfg *Config) CList(path string) ([]*Config, error) {
 		}
 	}
 	return list, nil
+}
+
+// CMap returns a map of string keys to Config objects
+func (cfg *Config) CMap(path string) (map[string]*Config, error) {
+	cm := make(map[string]*Config)
+	m, err := cfg.Map(path)
+	if err != nil {
+		return nil, err
+	}
+	for k, _ := range m {
+		c, err := cfg.Config.Get(fmt.Sprintf("%s.%d", path, k))
+		if err == nil {
+			cm[k] = &Config{Config: c}
+		}
+	}
+
+	return cm, nil
 }
 
 // Duration returns a time.Duration from a dictionary

@@ -7,9 +7,12 @@ import (
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
+	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/vars"
 )
+
+var Logger = log.Logger()
 
 // Sequence is a series of tasks that represent a single iteration of the loop
 type Sequence struct {
@@ -105,10 +108,10 @@ func (s *Sequence) stepCtx(n int) context.Context {
 }
 
 // Executes the specified single step/task in the sequence
-func (s *Sequence) executeStep(n int) error {
-	var err error
+func (s *Sequence) executeStep(ctx context.Context, n int) error {
+	var err, taskErr error
 	var ok bool
-	var runLatch bool //true if the task has already run once
+
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok = r.(error); !ok {
@@ -121,50 +124,57 @@ func (s *Sequence) executeStep(n int) error {
 	// Apply vars for this task to the task's context
 	taskCtx := s.stepCtx(n)
 
-	// Step through Conditions at this step, to determine whether this
+	// Step through pre Conditions to determine whether this
 	// task should be executed
 	for _, cond := range s.Conditions[n] {
-		for {
-			// This for loop executes inside a single condition
-			err = cond.Check(taskCtx)
-			switch err {
-			case nil:
-				// Only run the task if it has not yet run
-				if !runLatch {
-					//This must be a precondition
-					runLatch = true
-					err = tsk.Execute(taskCtx)
+		err = cond.Check(taskCtx)
+		switch err {
+		case nil:
+			// Condition passed, advance to the next tone
+			continue
+		case condition.ErrSkip:
+			return err
+		}
+	}
+
+	taskErr = tsk.Execute(taskCtx)
+	if taskErr != nil {
+		return taskErr
+	}
+
+	// Step through post conditions to evaluate if the task executed
+	// successfully
+	for _, cond := range s.Conditions[n] {
+		err = cond.Check(taskCtx)
+		switch err {
+		case nil:
+			return nil
+		case condition.ErrAbort, condition.ErrFail:
+			return err
+		case condition.ErrRetry:
+			// Retry task until condition tells us not to
+			for err == condition.ErrRetry {
+				taskErr = tsk.Execute(taskCtx)
+				if taskErr != nil {
+					return taskErr
 				}
-				// Regardless of whether the task was run,
-				// break out of this condition and
-				// continue to the next one
-				break
-			case condition.ErrSkip:
-				return err
-			case condition.ErrAbort:
-				//TODO Better handle panic? Should never get here anyway
-				return err
-			case condition.ErrRetry:
-				// Run task, but stay inside this condition
-				// The condition is responsible for signaling when we
-				// should stop retrying
-				continue
-			case condition.ErrFail:
-				return err
+				err = cond.Check(taskCtx)
 			}
 		}
 	}
-	return err
+
+	return taskErr
 }
 
 //Execute executes all remaining incomplete tasks in the Sequence
-func (s *Sequence) Execute() *Result {
+func (s *Sequence) Execute(ctx context.Context) *Result {
 	var err error
 	res := NewResult()
-	for n, _ := range s.Tasks[s.n:] {
+	for n, _ := range s.Tasks {
 		// set number of current step
 		s.n = n
-		err = s.executeStep(s.n)
+		Logger.WithField("sid", s.Id).WithField("n", n).Warn("Executing step")
+		err = s.executeStep(ctx, s.n)
 		if err != nil {
 			res.Errors = append(res.Errors, err)
 		}
@@ -174,7 +184,6 @@ func (s *Sequence) Execute() *Result {
 			break
 		}
 	}
-	s.cancel()
 	res.ReadContext(s.ctx)
 	return res
 }

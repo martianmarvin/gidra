@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/config"
@@ -73,13 +74,18 @@ func OpenFile(fn string) (*Script, error) {
 // Load loads a script file and initializes Sequences
 func (s *Script) Load(cfg *config.Config) error {
 	var err error
+	var seqTimeout time.Duration
 
 	// Parse yaml script and merge with default config
-	cfg, err = config.Default().Extend(cfg)
+	c, err := config.Default().Extend(cfg)
 	if err != nil {
 		return err
 	}
-	err = parser.Configure(s.Options, cfg)
+
+	// FIXME Workaround for stupid config.Extend for now
+	c.Set("tasks", cfg.UList("tasks"))
+
+	err = parser.Configure(s.Options, c)
 	if err != nil {
 		return err
 	}
@@ -96,7 +102,10 @@ func (s *Script) Load(cfg *config.Config) error {
 	ctx := configureContext(context.Background(), s.Options)
 
 	if seq := s.Options.BeforeSequence; seq != nil {
-		s.Add(seq.WithContext(ctx))
+		// Per sequence timeout
+		seqTimeout = s.Options.TaskTimeout * time.Duration(seq.Size())
+		seqctx, _ := context.WithTimeout(ctx, seqTimeout)
+		s.Add(seq.WithContext(seqctx))
 	}
 
 	if s.Options.MainSequence == nil {
@@ -104,6 +113,7 @@ func (s *Script) Load(cfg *config.Config) error {
 	}
 
 	iter := s.Options.Input["main"]
+	Logger.WithField("n", iter.Len()).Warn("Running loop")
 	for {
 		row, err := iter.Next()
 		if err == io.EOF {
@@ -113,13 +123,17 @@ func (s *Script) Load(cfg *config.Config) error {
 		}
 		seq := s.Options.MainSequence.WithContext(ctx)
 		seq.Row = row
-		seq.Id = int(row.Index)
-		s.Add(seq)
+
+		seqTimeout = s.Options.TaskTimeout * time.Duration(seq.Size())
+		seqctx, _ := context.WithTimeout(ctx, seqTimeout)
+		s.Add(seq.WithContext(seqctx))
 	}
 	iter.Close()
 
 	if seq := s.Options.AfterSequence; seq != nil {
-		s.Add(seq.WithContext(ctx))
+		seqTimeout = s.Options.TaskTimeout * time.Duration(seq.Size())
+		seqctx, _ := context.WithTimeout(ctx, seqTimeout)
+		s.Add(seq.WithContext(seqctx))
 	}
 
 	return err
@@ -133,26 +147,32 @@ func (s *Script) Add(seq *sequence.Sequence) {
 // Run runs all of the script's sequences
 // Once Run has been called on the script, no new sequences can be added, and
 // it should not be called again.
-func (s *Script) Run() {
+// Run returns a signal channel that can accept a boolean value to signal
+// cancellation
+func (s *Script) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	results := make(chan *sequence.Result)
-	go resultProcessor(results, s.Options.Output)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go resultProcessor(ctx, results, s.Options.Output)
+	s.enqueue()
 
 	Logger.Info("Starting Workers")
 	for i := 0; i < s.Options.Threads; i++ {
+		Logger.WithField("i", i).Warn("Starting worker...")
 		wg.Add(1)
-		go runner(s.queue, results, &wg)
+		go worker(ctx, s.queue, results, &wg)
 	}
-	go func() {
-		wg.Wait()
-		Logger.Info("All Workers Done")
-		close(results)
-	}()
+	wg.Wait()
+	Logger.Info("All Workers Done")
 }
 
-// Goroutine that pops sequences and adds them to the queue
+// Add sequences to the queue
 func (s *Script) enqueue() {
-	for _, seq := range s.sequences {
+	for i, seq := range s.sequences {
+		seq.Id = i
 		s.queue <- seq
 	}
 	close(s.queue)
@@ -165,28 +185,44 @@ func (s *Script) enqueue() {
 func (s *Script) DryRun(w io.Writer) {
 	n := (int(s.Options.Input["main"].Len()) * s.Options.MainSequence.Size())
 	fmt.Fprintf(w, "DRY RUN %d tasks\n", n)
-	go s.enqueue()
+	s.enqueue()
 	for seq := range s.queue {
 		fmt.Fprint(w, seq)
 	}
 }
 
 // Goroutine worker that runs sequences and returns results
-func runner(queue <-chan *sequence.Sequence, results chan<- *sequence.Result, wg *sync.WaitGroup) {
+func worker(ctx context.Context, queue <-chan *sequence.Sequence, results chan<- *sequence.Result, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for seq := range queue {
-		results <- seq.Execute()
+		select {
+		case results <- seq.Execute(ctx):
+			Logger.Warn("Sent Result")
+		case <-ctx.Done():
+			return
+		}
 	}
-	wg.Done()
+	Logger.Warn("worker shutting down...")
 }
 
 // Goroutine that receives results and processes them with OutputFunc
-func resultProcessor(results <-chan *sequence.Result, output datasource.WriteableTable, filters ...datasource.FilterFunc) {
-	for res := range results {
-		if err := res.Err(); err != nil {
-			Logger.Error(err)
-			continue
+func resultProcessor(ctx context.Context, results <-chan *sequence.Result, output datasource.WriteableTable, filters ...datasource.FilterFunc) {
+	defer Logger.Warn("processor shutting down...")
+	for {
+		select {
+		case res := <-results:
+			Logger.Warn(res)
+			if err := res.Err(); err != nil {
+				Logger.Error(err)
+				continue
+			}
+			if res.Output.Len() > 0 {
+				output.Append(res.Output)
+				output.WriteTo(nil)
+			}
+		case <-ctx.Done():
+			return
 		}
-
 	}
 }
 

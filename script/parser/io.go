@@ -75,21 +75,15 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 }
 
 func outputParser(s *options.ScriptOptions, cfg *config.Config) error {
-	var err error
 	outputs, err := cfg.Map(cfgOutput)
-	if err != nil {
-		// No outputs, writing directly to stdout
-		s.Output, err = outputWriter("tsv", os.Stdout)
+	if err == nil {
+		parsed, err := parseOutput(outputs)
 		if err != nil {
 			return err
 		}
-		return nil
-	}
-	parsed, err := parseOutput(outputs)
-	if err == nil {
 		s.Output = parsed
 	}
-	return err
+	return nil
 }
 
 func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error) {

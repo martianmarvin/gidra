@@ -2,7 +2,6 @@ package task
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -96,7 +95,6 @@ func (c *configurable) Configure(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("%v\n", c.config)
 
 	return nil
 }

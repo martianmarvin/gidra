@@ -35,7 +35,7 @@ type ScriptOptions struct {
 	Input map[string]datasource.ReadableTable
 
 	// File to write output, or stdout if none
-	Output *datasource.WriteCloser
+	Output datasource.WriteableTable
 
 	// Sequence to run before the main loop
 	BeforeSequence *sequence.Sequence
