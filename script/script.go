@@ -36,6 +36,8 @@ type Script struct {
 
 	// Channel that receives results from completed sequences
 	results chan *sequence.Result
+
+	wg sync.WaitGroup
 }
 
 // New initializes a new Script
@@ -74,7 +76,6 @@ func OpenFile(fn string) (*Script, error) {
 // Load loads a script file and initializes Sequences
 func (s *Script) Load(cfg *config.Config) error {
 	var err error
-	var seqTimeout time.Duration
 
 	// Parse yaml script and merge with default config
 	c, err := config.Default().Extend(cfg)
@@ -99,13 +100,8 @@ func (s *Script) Load(cfg *config.Config) error {
 		s.Options.Input["main"] = datasource.NewNopReader(s.Options.Loop)
 	}
 
-	ctx := configureContext(context.Background(), s.Options)
-
 	if seq := s.Options.BeforeSequence; seq != nil {
-		// Per sequence timeout
-		seqTimeout = s.Options.TaskTimeout * time.Duration(seq.Size())
-		seqctx, _ := context.WithTimeout(ctx, seqTimeout)
-		s.Add(seq.WithContext(seqctx))
+		s.Add(seq)
 	}
 
 	if s.Options.MainSequence == nil {
@@ -121,19 +117,15 @@ func (s *Script) Load(cfg *config.Config) error {
 		} else if err != nil {
 			return err
 		}
-		seq := s.Options.MainSequence.WithContext(ctx)
+		seq := s.Options.MainSequence.Copy()
 		seq.Row = row
 
-		seqTimeout = s.Options.TaskTimeout * time.Duration(seq.Size())
-		seqctx, _ := context.WithTimeout(ctx, seqTimeout)
-		s.Add(seq.WithContext(seqctx))
+		s.Add(seq)
 	}
 	iter.Close()
 
 	if seq := s.Options.AfterSequence; seq != nil {
-		seqTimeout = s.Options.TaskTimeout * time.Duration(seq.Size())
-		seqctx, _ := context.WithTimeout(ctx, seqTimeout)
-		s.Add(seq.WithContext(seqctx))
+		s.Add(seq)
 	}
 
 	return err
@@ -150,22 +142,20 @@ func (s *Script) Add(seq *sequence.Sequence) {
 // Run returns a signal channel that can accept a boolean value to signal
 // cancellation
 func (s *Script) Run(ctx context.Context) {
-	var wg sync.WaitGroup
-	results := make(chan *sequence.Result)
-
+	ctx = configureContext(ctx, s.Options)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go resultProcessor(ctx, results, s.Options.Output)
+	go s.resultProcessor(ctx)
 	s.enqueue()
 
 	Logger.Info("Starting Workers")
 	for i := 0; i < s.Options.Threads; i++ {
 		Logger.WithField("i", i).Warn("Starting worker...")
-		wg.Add(1)
-		go worker(ctx, s.queue, results, &wg)
+		s.wg.Add(1)
+		go s.worker(ctx)
 	}
-	wg.Wait()
+	s.wg.Wait()
 	Logger.Info("All Workers Done")
 }
 
@@ -192,12 +182,15 @@ func (s *Script) DryRun(w io.Writer) {
 }
 
 // Goroutine worker that runs sequences and returns results
-func worker(ctx context.Context, queue <-chan *sequence.Sequence, results chan<- *sequence.Result, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for seq := range queue {
+func (s *Script) worker(ctx context.Context) {
+	defer s.wg.Done()
+	for seq := range s.queue {
+		seqTimeout := s.Options.TaskTimeout * time.Duration(seq.Size())
+		ctx, cancel := context.WithTimeout(ctx, seqTimeout)
 		select {
-		case results <- seq.Execute(ctx):
+		case s.results <- seq.Execute(ctx):
 			Logger.Warn("Sent Result")
+			cancel()
 		case <-ctx.Done():
 			return
 		}
@@ -206,11 +199,12 @@ func worker(ctx context.Context, queue <-chan *sequence.Sequence, results chan<-
 }
 
 // Goroutine that receives results and processes them with OutputFunc
-func resultProcessor(ctx context.Context, results <-chan *sequence.Result, output datasource.WriteableTable, filters ...datasource.FilterFunc) {
+func (s *Script) resultProcessor(ctx context.Context, filters ...datasource.FilterFunc) {
+	output := s.Options.Output
 	defer Logger.Warn("processor shutting down...")
 	for {
 		select {
-		case res := <-results:
+		case res := <-s.results:
 			Logger.Warn(res)
 			if err := res.Err(); err != nil {
 				Logger.Error(err)

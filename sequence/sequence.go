@@ -9,7 +9,6 @@ import (
 	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/task"
-	"github.com/martianmarvin/vars"
 )
 
 var Logger = log.Logger()
@@ -33,11 +32,6 @@ type Sequence struct {
 
 	// Options corresponding to each task in the sequence
 	Configs []*config.Config
-
-	//Context shared by all requests in this sequence
-	ctx context.Context
-
-	cancel context.CancelFunc
 }
 
 func New() *Sequence {
@@ -46,32 +40,14 @@ func New() *Sequence {
 		Conditions: make([][]condition.Condition, 0),
 		Configs:    make([]*config.Config, 0),
 	}
-	s.ctx, s.cancel = context.WithCancel(defaultContext())
 
 	return s
 }
 
-// Initialize default context objects
-func defaultContext() context.Context {
-	ctx := context.Background()
-	ctx = vars.ToContext(ctx, vars.New())
-	return ctx
-}
-
-// Context returns this sequence's context
-func (s *Sequence) Context() context.Context {
-	if s.ctx != nil {
-		return s.ctx
-	}
-	return defaultContext()
-}
-
-// WithContext returns a shallow copy of the Sequence with the new context
-func (s *Sequence) WithContext(ctx context.Context) *Sequence {
+// Copy returns a shallow copy of the Sequence with the new context
+func (s *Sequence) Copy() *Sequence {
 	s2 := New()
 	*s2 = *s
-
-	s2.ctx = ctx
 
 	return s2
 }
@@ -100,13 +76,6 @@ func (s *Sequence) Size() int {
 	return len(s.Tasks)
 }
 
-// Computes the context for the specified step
-func (s *Sequence) stepCtx(n int) context.Context {
-	ctx := s.Context()
-	ctx = config.ToContext(ctx, s.Configs[n])
-	return ctx
-}
-
 // Executes the specified single step/task in the sequence
 func (s *Sequence) executeStep(ctx context.Context, n int) error {
 	var err, taskErr error
@@ -122,12 +91,12 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 
 	tsk := s.Tasks[n]
 	// Apply vars for this task to the task's context
-	taskCtx := s.stepCtx(n)
+	ctx = config.ToContext(ctx, s.Configs[n])
 
 	// Step through pre Conditions to determine whether this
 	// task should be executed
 	for _, cond := range s.Conditions[n] {
-		err = cond.Check(taskCtx)
+		err = cond.Check(ctx)
 		switch err {
 		case nil:
 			// Condition passed, advance to the next tone
@@ -137,7 +106,7 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 		}
 	}
 
-	taskErr = tsk.Execute(taskCtx)
+	taskErr = tsk.Execute(ctx)
 	if taskErr != nil {
 		return taskErr
 	}
@@ -145,7 +114,7 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 	// Step through post conditions to evaluate if the task executed
 	// successfully
 	for _, cond := range s.Conditions[n] {
-		err = cond.Check(taskCtx)
+		err = cond.Check(ctx)
 		switch err {
 		case nil:
 			return nil
@@ -154,11 +123,11 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 		case condition.ErrRetry:
 			// Retry task until condition tells us not to
 			for err == condition.ErrRetry {
-				taskErr = tsk.Execute(taskCtx)
+				taskErr = tsk.Execute(ctx)
 				if taskErr != nil {
 					return taskErr
 				}
-				err = cond.Check(taskCtx)
+				err = cond.Check(ctx)
 			}
 		}
 	}
@@ -168,31 +137,38 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 
 //Execute executes all remaining incomplete tasks in the Sequence
 func (s *Sequence) Execute(ctx context.Context) *Result {
-	var err error
 	res := NewResult()
+	done := make(chan error, 1)
 	for n, _ := range s.Tasks {
 		// set number of current step
 		s.n = n
 		Logger.WithField("sid", s.Id).WithField("n", n).Warn("Executing step")
-		err = s.executeStep(ctx, s.n)
-		if err != nil {
-			res.Errors = append(res.Errors, err)
-		}
-
-		//TODO Instrument logging here
-		if err == condition.ErrAbort || err == condition.ErrFail {
-			break
+		go func() {
+			done <- s.executeStep(ctx, s.n)
+		}()
+		select {
+		case err := <-done:
+			//TODO Instrument logging here
+			if err == condition.ErrAbort {
+				panic("Aborting script!")
+			} else if err == condition.ErrFail {
+				return res
+			} else if err != nil {
+				res.Errors = append(res.Errors, err)
+			}
+		case <-ctx.Done():
+			return res
 		}
 	}
-	res.ReadContext(s.ctx)
+	// res.ReadContext(s.ctx) TODO get result
 	return res
 }
 
 // String implements the Stringer interface
 func (s *Sequence) String() string {
 	var out string
-	for n, tsk := range s.Tasks {
-		out += task.Show(s.stepCtx(n), tsk) + "\n"
-	}
+	// for n, tsk := range s.Tasks {
+	// 	out += task.Show(s.stepCtx(n), tsk) + "\n"
+	// }
 	return out
 }

@@ -2,6 +2,6 @@ config:
   loop: 5
 tasks:
   - sleep:
-      seconds: 3
+      seconds: 30
   - sleep:
       seconds: 2
