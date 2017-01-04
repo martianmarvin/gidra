@@ -6,7 +6,7 @@ config:
 	verbosity: 4
 	threads: 100
 	loop: 1
-	task_timeout: 15
+	task_timeout: 15s
 default:
   http: &http
 	follow_redirects: false
@@ -15,5 +15,5 @@ default:
 		accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
 		accept-language: en-US,en;q=0.5
 		accept-encoding: gzip, deflate
-	timeout: 15
+	timeout: 15s
 `

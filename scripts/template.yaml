@@ -3,7 +3,7 @@ version: '1'
 config:
   verbosity: 4
   threads: 100
-  task_timeout: 15
+  task_timeout: 15s
   loop: 10
 
 default:

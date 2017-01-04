@@ -99,7 +99,7 @@ func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error)
 		adapter = strings.TrimLeft(path.Ext(source), ".")
 	}
 
-	writer, err := os.OpenFile(source, os.O_APPEND|os.O_WRONLY, 0600)
+	writer, err := os.OpenFile(source, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
 	}

@@ -57,7 +57,9 @@ func (g *Global) Copy() *Global {
 	for k, v := range g.Inputs {
 		g2.Inputs[k] = v
 	}
-	*g2.Proxy = *g.Proxy
+	if g.Proxy != nil {
+		*g2.Proxy = *g.Proxy
+	}
 	*g2.Page = *g.Page
 	return g2
 }

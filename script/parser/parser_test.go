@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	// Register datasource and task types
+	"github.com/davecgh/go-spew/spew"
 	_ "github.com/martianmarvin/gidra/datasource/all"
 	_ "github.com/martianmarvin/gidra/task/all"
 
@@ -68,6 +69,6 @@ func TestParser(t *testing.T) {
 		assert.Len(seq.Tasks, n)
 	}
 
-	// spew.Dump(opts)
+	spew.Dump(opts)
 
 }

@@ -17,7 +17,7 @@ config:
 	loop: 5
 tasks:
 	- sleep:
-		seconds: 2
+		duration: 2s
 `,
 	`
 http:
@@ -30,7 +30,7 @@ before:
 	- get:
 		url: http://www.example.com/
 	- sleep:
-		seconds: 1
+		duration: 2s
 tasks:
 	- get:
 		url: http://www.example.com/get
