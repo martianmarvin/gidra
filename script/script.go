@@ -78,13 +78,13 @@ func (s *Script) Load(cfg *config.Config) error {
 	var err error
 
 	// Parse yaml script and merge with default config
-	c, err := config.Default().Extend(cfg)
+	c, err := config.Default.Extend(cfg)
 	if err != nil {
 		return err
 	}
 
 	// FIXME Workaround for stupid config.Extend for now
-	c.Set("tasks", cfg.UList("tasks"))
+	// c.Set("tasks", cfg.UList("tasks"))
 
 	err = parser.Configure(s.Options, c)
 	if err != nil {

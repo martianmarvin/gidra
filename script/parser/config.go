@@ -11,23 +11,24 @@ func init() {
 
 func configParser(s *options.ScriptOptions, cfg *config.Config) error {
 	var err error
+	cfg = cfg.Get(cfgConfig, nil)
 	// Set by default config yaml in config.go, so they always exist
-	s.Loop, err = cfg.Int(cfgConfigLoop)
+	s.Loop, err = cfg.GetIntE(cfgConfigLoop)
 	if err != nil {
 		return err
 	}
 
-	s.Threads, err = cfg.Int(cfgConfigThreads)
+	s.Threads, err = cfg.GetIntE(cfgConfigThreads)
 	if err != nil {
 		return err
 	}
 
-	s.Verbosity, err = cfg.Int(cfgConfigVerbosity)
+	s.Verbosity, err = cfg.GetIntE(cfgConfigVerbosity)
 	if err != nil {
 		return err
 	}
 
-	s.TaskTimeout, err = cfg.Duration(cfgConfigTaskTimeout)
+	s.TaskTimeout, err = cfg.GetDurationE(cfgConfigTaskTimeout)
 	if err != nil {
 		return err
 	}

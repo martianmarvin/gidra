@@ -6,7 +6,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/script/options"
@@ -18,7 +17,7 @@ func init() {
 }
 
 func inputParser(s *options.ScriptOptions, cfg *config.Config) error {
-	inputs, err := cfg.MapList("")
+	inputs, err := cfg.GetMapSliceE(cfgInputs)
 	if err != nil {
 		return err
 	}
@@ -41,7 +40,7 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 	for _, input := range inputs {
 		source, ok := input[cfgIOSource].(string)
 		if !ok || len(source) == 0 {
-			return nil, gidra.FieldError{cfgIOSource}
+			return nil, config.FieldError{cfgIOSource}
 		}
 
 		adapter, ok := input[cfgIOAdapter].(string)
@@ -60,7 +59,7 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 				}
 				readers["main"] = reader
 			} else {
-				return nil, gidra.FieldError{cfgIOVars}
+				return nil, config.FieldError{cfgIOVars}
 			}
 		} else {
 			reader, err := datasource.FromFileType(source, adapter)
@@ -75,7 +74,7 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 }
 
 func outputParser(s *options.ScriptOptions, cfg *config.Config) error {
-	outputs, err := cfg.Map(cfgOutput)
+	outputs, err := cfg.GetMapE(cfgOutput)
 	if err == nil {
 		parsed, err := parseOutput(outputs)
 		if err != nil {
@@ -89,7 +88,7 @@ func outputParser(s *options.ScriptOptions, cfg *config.Config) error {
 func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error) {
 	source, ok := output[cfgIOSource].(string)
 	if !ok || len(source) == 0 {
-		return nil, gidra.FieldError{cfgIOSource}
+		return nil, config.FieldError{cfgIOSource}
 	}
 
 	adapter, ok := output[cfgIOAdapter].(string)
@@ -106,7 +105,7 @@ func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error)
 	}
 
 	if writer == nil {
-		return nil, gidra.FieldError{cfgIOSource}
+		return nil, config.FieldError{cfgIOSource}
 	}
 
 	return outputWriter(adapter, writer)

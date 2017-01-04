@@ -77,7 +77,7 @@ func New() *Client {
 		},
 	}
 	if c.Options.Proxy != nil {
-		c.dialer.Proxy, _ = c.Options.Proxy.Current()
+		c.dialer.Proxy = c.Options.Proxy
 	}
 	c.client.Dial = c.dialer.FastDial
 	return c
@@ -93,17 +93,7 @@ func (c *Client) WithOptions(opts *http.Options) *Client {
 }
 
 func (c *Client) Dial(addr string) (net.Conn, error) {
-	var err error
-	if c.Options.Proxy != nil {
-		prox, err := c.Options.Proxy.Current()
-		if err != nil {
-			return nil, err
-		}
-		c.conn, err = c.dialer.Dial(addr, prox)
-	} else {
-		c.conn, err = c.dialer.Dial(addr, nil)
-	}
-	return c.conn, err
+	return c.dialer.Dial(addr, c.Options.Proxy)
 }
 
 //Close closes the underlying connection and releases all responses

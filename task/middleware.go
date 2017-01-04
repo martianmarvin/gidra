@@ -39,7 +39,7 @@ func (t *task) Execute(ctx context.Context) error {
 	// Read global config
 	// TODO refactor to avoid using config
 	cfg := config.FromContext(ctx)
-	timeout, err := cfg.Duration(cfgTimeout)
+	timeout, err := cfg.GetDurationE(cfgTimeout)
 	if err != nil || timeout < time.Second {
 		timeout = defaultTimeout
 	}
@@ -93,8 +93,6 @@ func (t *task) configure(ctx context.Context) error {
 	}
 
 	// Populate task's config
-	cfg := config.FromContext(ctx)
-	log.Logger().Warn(cfg.Map(""))
 	if c, ok := t.task.(Configurable); ok {
 		err := c.Configure(config.FromContext(ctx))
 		if err != nil {

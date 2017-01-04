@@ -11,7 +11,7 @@ func init() {
 }
 
 func varsParser(s *options.ScriptOptions, cfg *config.Config) error {
-	taskVars, err := cfg.Map("")
+	taskVars, err := cfg.GetMapE(cfgVars)
 	if err != nil {
 		s.Vars = vars.New()
 	} else {

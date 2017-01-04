@@ -3,7 +3,6 @@ package parser
 import (
 	"context"
 
-	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/script/options"
@@ -20,10 +19,11 @@ func init() {
 }
 
 func beforeSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
+	// Only one before sequence is allowed
 	if s.BeforeSequence != nil {
-		return gidra.KeyError{cfgSeqBefore}
+		return config.KeyError{cfgSeqBefore}
 	}
-	taskList, err := cfg.CList("")
+	taskList, err := cfg.GetConfigSliceE(cfgSeqBefore)
 	if err != nil {
 		return err
 	}
@@ -39,9 +39,9 @@ func beforeSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 
 func mainSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 	if s.MainSequence != nil {
-		return gidra.KeyError{cfgSeqTasks}
+		return config.KeyError{cfgSeqTasks}
 	}
-	taskList, err := cfg.CList("")
+	taskList, err := cfg.GetConfigSliceE(cfgSeqTasks)
 	if err != nil {
 		return err
 	}
@@ -56,10 +56,11 @@ func mainSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 }
 
 func afterSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
+	// Only one after sequence is allowed
 	if s.AfterSequence != nil {
-		return gidra.KeyError{cfgSeqAfter}
+		return config.KeyError{cfgSeqAfter}
 	}
-	taskList, err := cfg.CList("")
+	taskList, err := cfg.GetConfigSliceE(cfgSeqAfter)
 	if err != nil {
 		return err
 	}
@@ -80,10 +81,7 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 		var taskName string
 		var taskConds []condition.Condition
 
-		m, err := taskcfg.Map("")
-		if err != nil {
-			return nil, err
-		}
+		m := taskcfg.Map()
 		// task config should have one key, which is the task name
 		for k, _ := range m {
 			taskName = k
@@ -91,11 +89,7 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 		}
 
 		// Get task sub config map
-		cfg, ok := taskcfg.CheckGet(taskName)
-		if !ok {
-			return nil, gidra.KeyError{taskName}
-		}
-		tm, err := cfg.Map("")
+		tm, err := taskcfg.GetMapE(taskName)
 		if err != nil {
 			return nil, err
 		}
@@ -104,8 +98,8 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 		for k, _ := range tm {
 			cond, err := parseCondition(k, taskcfg)
 			if err != nil {
-				if err, ok := err.(gidra.KeyError); ok {
-					// gidra.KeyError simply means this item is not a
+				if err, ok := err.(config.KeyError); ok {
+					// config.KeyError simply means this item is not a
 					// condition
 					continue
 				} else {
@@ -116,7 +110,7 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 		}
 
 		tsk := task.New(taskName)
-		seq.Add(tsk, taskConds, cfg)
+		seq.Add(tsk, taskConds, taskcfg)
 	}
 	return seq, nil
 }
@@ -140,18 +134,21 @@ func parseCondition(key string, cfg *config.Config) (condition.Condition, error)
 	case cfgTaskAbortCond:
 		cond = condition.NewAbort(callbacks...)
 	case cfgTaskRetryCond:
-		limit := cfg.UInt(key+"."+cfgTaskLimit, 1)
+		limit := cfg.GetInt(key + "." + cfgTaskLimit)
+		if limit <= 0 {
+			limit = 1
+		}
 		cond = condition.NewRetry(limit, callbacks...)
 	case cfgTaskFailCond:
 		cond = condition.NewFail(callbacks...)
 	default:
-		return nil, gidra.KeyError{key}
+		return nil, config.KeyError{key}
 	}
 
 	ck := key + "." + cfgTaskCond
-	tmpl, err := cfg.String(ck)
+	tmpl, err := cfg.GetStringE(ck)
 	if err != nil {
-		return nil, gidra.KeyError{ck}
+		return nil, config.KeyError{ck}
 	}
 
 	err = cond.Parse(tmpl)
@@ -164,7 +161,7 @@ func parseCondition(key string, cfg *config.Config) (condition.Condition, error)
 // TODO support multiple callbacks supplied with a list?
 func parseCallbacks(key string, cfg *config.Config) []condition.CallBackFunc {
 	callbacks := make([]condition.CallBackFunc, 0)
-	tmplText, err := cfg.String(key)
+	tmplText, err := cfg.GetStringE(key)
 	if err != nil {
 		return callbacks
 	}

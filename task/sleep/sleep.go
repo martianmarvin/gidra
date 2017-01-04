@@ -23,7 +23,7 @@ type Task struct {
 }
 
 type Config struct {
-	Duration time.Duration `task:"seconds,required"`
+	Duration time.Duration `task:"required"`
 }
 
 func New() task.Task {

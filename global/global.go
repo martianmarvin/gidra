@@ -4,6 +4,7 @@ package global
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/client/httpclient"
@@ -26,7 +27,7 @@ type Global struct {
 	Vars map[string]interface{}
 
 	// Proxy represents the proxy list used by the task
-	Proxy *client.URLList
+	Proxy *url.URL
 
 	// Page is the page requested by the last request
 	Page *client.Page
@@ -43,7 +44,6 @@ func New() *Global {
 	return &Global{
 		Vars:   make(map[string]interface{}),
 		Inputs: make(map[string]datasource.ReadableTable),
-		Proxy:  client.NewURLList(),
 		Page:   client.NewPage(),
 	}
 }

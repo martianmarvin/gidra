@@ -1,20 +1,19 @@
 package http
 
 import (
+	"net/url"
 	"time"
-
-	"github.com/martianmarvin/gidra/client"
 )
 
 // Options are defaults that are shared by all HTTP clients
 type Options struct {
-	URL *client.URLList
+	URL *url.URL
 
 	FollowRedirects bool
 
 	Timeout time.Duration
 
-	Proxy *client.URLList
+	Proxy *url.URL
 
 	Headers map[string]string
 

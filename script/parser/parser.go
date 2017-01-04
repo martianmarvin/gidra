@@ -3,7 +3,6 @@ package parser
 import (
 	"sync"
 
-	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/script/options"
@@ -73,7 +72,7 @@ func Configure(s *options.ScriptOptions, cfg *config.Config) error {
 	}
 
 	// Iterate remaining top level keys
-	for key, _ := range cfg.UMap("") {
+	for key, _ := range cfg.Map() {
 		if parsed[key] {
 			continue
 		}
@@ -87,11 +86,10 @@ func Configure(s *options.ScriptOptions, cfg *config.Config) error {
 			// No parser registered for this key, skip
 			continue
 		}
-		conf, ok := cfg.CheckGet(key)
-		if !ok {
-			return gidra.KeyError{key}
+		if !cfg.IsSet(key) {
+			return config.KeyError{key}
 		}
-		err := parser(s, conf)
+		err := parser(s, cfg)
 		if err != nil {
 			return err
 		}
@@ -110,11 +108,11 @@ func wrapParser(key string, fn ParseFunc) ParseFunc {
 		}
 		entry := Logger.WithField("type", "Unknown").WithField("key", key)
 		switch err := err.(type) {
-		case gidra.FieldError:
+		case config.FieldError:
 			entry = entry.WithField("type", "FieldError").WithField("field", err.Name)
-		case gidra.KeyError:
+		case config.KeyError:
 			entry = entry.WithField("type", "KeyError").WithField("key", err.Name)
-		case gidra.ValueError:
+		case config.ValueError:
 			entry = entry.WithField("type", "ValueError").WithField("value", err.Name)
 		}
 		entry.Error(err)

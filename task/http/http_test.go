@@ -2,6 +2,9 @@ package http
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -11,6 +14,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+//Spins up a test HTTP server that prints the request
+func testServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Write(w)
+	}))
+}
 
 // Helper to run an http request
 func testReq(t *testing.T, tsk task.Task, conf string, expected ...string) {
@@ -38,9 +48,10 @@ func testReq(t *testing.T, tsk task.Task, conf string, expected ...string) {
 }
 
 func TestGet(t *testing.T) {
-	conf := `
-url: "http://httpbin.org/get"
-headers:
+	ts := testServer()
+	defer ts.Close()
+	conf := fmt.Sprintf("url: %s\n", ts.URL)
+	conf += `headers:
 	user-agent: Gidra
 	h1: v1
 	h2: v2
@@ -51,9 +62,10 @@ headers:
 }
 
 func TestPost(t *testing.T) {
-	conf := `
-url: "http://httpbin.org/post"
-headers:
+	ts := testServer()
+	defer ts.Close()
+	conf := fmt.Sprintf("url: %s\n", ts.URL)
+	conf += `headers:
 	user-agent: Gidra
 	h1: v1
 	h2: v2

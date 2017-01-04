@@ -7,13 +7,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"strings"
 	"time"
 
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/olebedev/config"
+	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 )
 
@@ -48,52 +49,26 @@ func New() *Config {
 }
 
 // Extend merges the new config with this one
-// TODO Not fully recursive merge
 func (cfg *Config) Extend(newcfg *Config) (*Config, error) {
-	cf, err := cfg.Config.Extend(newcfg.Config)
-	if err != nil {
-		return nil, err
+	cf := newcfg.String()
+	if len(cf) == 0 {
+		return cfg, ErrParse
 	}
-	cfg.Config = cf
-	return cfg, nil
+
+	r := strings.NewReader(cf)
+	err := cfg.Viper.MergeConfig(r)
+	return cfg, err
 }
 
-// Recursively merge a value(map, list, etc) into the config
-// TODO Doesn't work currently, fix and simplify
-func deepMerge(cfg, newcfg *Config) (*Config, error) {
-	val := newcfg.Root
-
-	switch val := val.(type) {
-	case string, bool, int, float64:
-		cfg.Set("", val)
-		return cfg, nil
-	case map[string]interface{}:
-		for k, _ := range val {
-			m, err := deepMerge(cfg.Get(k, New()), newcfg.Get(k, New()))
-			if err != nil {
-				return cfg, err
-			}
-			err = cfg.Set(k, m)
-			if err != nil {
-				return cfg, err
-			}
-		}
-		return cfg, nil
-	case []interface{}:
-		l := make([]interface{}, len(val))
-		for i, _ := range val {
-			k := fmt.Sprintf("%d", i)
-			item, err := deepMerge(cfg.Get(k, New()), newcfg.Get(k, New()))
-			if err != nil {
-				return cfg, err
-			}
-			l[i] = item
-		}
-		err := cfg.Set("", append(cfg.UList(""), l...))
-		return cfg, err
-	default:
-		return cfg, nil
+// Get the underlying value or return an error
+func (cfg *Config) getValue(path string) (interface{}, error) {
+	if cfg.Viper == nil || len(path) == 0 {
+		return nil, KeyError{path}
 	}
+	if !cfg.Viper.InConfig(path) {
+		return nil, FieldError{path}
+	}
+	return cfg.Viper.Get(path), nil
 }
 
 // Get returns the config at path, or the default if not found
@@ -110,184 +85,243 @@ func (cfg *Config) CheckGet(path string) (*Config, bool) {
 	return &Config{Viper: cfg.Viper.Sub(path)}, cfg.Viper.IsSet(path)
 }
 
-// StringMap returns a map with string values
-func (cfg *Config) StringMap(path string) (map[string]string, error) {
-	m, err := cfg.Map(path)
+// GetInterface returns the value as an interface{} without casting
+func (cfg *Config) GetInterfaceE(path string) (interface{}, error) {
+	return cfg.getValue(path)
+}
+
+func (cfg *Config) GetInterface(path string) interface{} {
+	v, err := cfg.getValue(path)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	sm := make(map[string]string)
-	for k, v := range m {
-		sm[k] = fmt.Sprint(v)
-	}
-	return sm, nil
+	return v
 }
 
-//UStringMap returns a map[string]string or defaults
-func (cfg *Config) UStringMap(path string, defaults ...map[string]string) map[string]string {
-	defs := make([]map[string]interface{}, 0)
-	for _, def := range defaults {
-		dm := make(map[string]interface{})
-		for k, v := range def {
-			dm[k] = v
-		}
-		defs = append(defs, dm)
-	}
-
-	m := cfg.UMap(path, defs...)
-	sm := make(map[string]string)
-	for k, v := range m {
-		sm[k] = fmt.Sprint(v)
-	}
-	return sm
-}
-
-// StringList returns a list of string values
-func (cfg *Config) StringList(path string) ([]string, error) {
-	list := make([]string, 0)
-	l, err := cfg.List(path)
+func (cfg *Config) GetStringE(path string) (string, error) {
+	v, err := cfg.getValue(path)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	for _, v := range l {
-		list = append(list, fmt.Sprint(v))
-	}
-	return list, nil
+	val, err := cast.ToStringE(v)
+	return val, NewValueError(path, err)
 }
 
-// UStringList returns a list of string values or the default
-func (cfg *Config) UStringList(path string, defaults ...[]string) []string {
-	defs := make([][]interface{}, 0)
-	for _, def := range defaults {
-		dl := make([]interface{}, len(def))
-		for i, v := range def {
-			dl[i] = v
-		}
-		defs = append(defs, dl)
-	}
-	l := cfg.UList(path, defs...)
-
-	list := make([]string, len(l))
-	for j, v := range l {
-		list[j] = fmt.Sprint(v)
-	}
-	return list
-}
-
-// MapList returns a slice of map[string]interface{}
-func (cfg *Config) MapList(path string) ([]map[string]interface{}, error) {
-	list := make([]map[string]interface{}, 0)
-	l, err := cfg.List(path)
+func (cfg *Config) GetBoolE(path string) (bool, error) {
+	v, err := cfg.getValue(path)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	for i, _ := range l {
-		m, err := cfg.Map(fmt.Sprintf("%s.%d", path, i))
-		if err == nil {
-			list = append(list, m)
-		}
-	}
-	return list, nil
+	val, err := cast.ToBoolE(v)
+	return val, NewValueError(path, err)
 }
 
-// CList returns a slice of Config objects that can be accessed with the
-// other methods
-func (cfg *Config) CList(path string) ([]*Config, error) {
-	list := make([]*Config, 0)
-	l, err := cfg.List(path)
-	if err != nil {
-		return nil, err
-	}
-	for i, _ := range l {
-		c, err := cfg.Config.Get(fmt.Sprintf("%s.%d", path, i))
-		if err == nil {
-			list = append(list, &Config{Config: c})
-		}
-	}
-	return list, nil
-}
-
-// CMap returns a map of string keys to Config objects
-func (cfg *Config) CMap(path string) (map[string]*Config, error) {
-	cm := make(map[string]*Config)
-	m, err := cfg.Map(path)
-	if err != nil {
-		return nil, err
-	}
-	for k, _ := range m {
-		c, err := cfg.Config.Get(fmt.Sprintf("%s.%d", path, k))
-		if err == nil {
-			cm[k] = &Config{Config: c}
-		}
-	}
-
-	return cm, nil
-}
-
-// Duration returns a time.Duration from a dictionary
-func (cfg *Config) Duration(path string) (time.Duration, error) {
-	var t time.Duration
-	// Try parsing an int first, defaulting to seconds
-	i, err := cfg.Int(path)
-	if err == nil {
-		t = time.Duration(i) * time.Second
-		return t, nil
-	}
-
-	m, err := cfg.Map(path)
+func (cfg *Config) GetIntE(path string) (int, error) {
+	v, err := cfg.getValue(path)
 	if err != nil {
 		return 0, err
 	}
-
-	for key, _ := range m {
-		val, err := cfg.Int(path + "." + key)
-		if err != nil {
-			return 0, err
-		}
-		var unit time.Duration
-		switch key {
-		case "milliseconds", "ms":
-			unit = time.Millisecond
-		case "seconds", "s":
-			unit = time.Second
-		case "hours", "h":
-			unit = time.Hour
-		default:
-			unit = 0
-		}
-		t += time.Duration(val) * unit
-	}
-
-	return t, nil
+	val, err := cast.ToIntE(v)
+	return val, NewValueError(path, err)
 }
 
-// URL returns a *url.URL from a string
-func (cfg *Config) URL(path string) (*url.URL, error) {
-	rawurl, err := cfg.String(path)
+func (cfg *Config) GetInt64E(path string) (int64, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return 0, err
+	}
+	val, err := cast.ToInt64E(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetFloat64E(path string) (float64, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return 0.0, err
+	}
+	val, err := cast.ToFloat64E(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetTimeE(path string) (time.Time, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	val, err := cast.ToTimeE(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetDurationE(path string) (time.Duration, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return time.Duration(0), err
+	}
+	val, err := cast.ToDurationE(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetSliceE(path string) ([]interface{}, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return nil, err
+	}
+	val, err := cast.ToSliceE(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetSlice(path string) []interface{} {
+	l, err := cfg.GetSliceE(path)
+	if err != nil {
+		return make([]interface{}, 0)
+	}
+	return l
+}
+
+func (cfg *Config) GetStringSliceE(path string) ([]string, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return nil, err
+	}
+	val, err := cast.ToStringSliceE(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetMapE(path string) (map[string]interface{}, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return nil, err
+	}
+	val, err := cast.ToStringMapE(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetMap(path string) map[string]interface{} {
+	m, err := cfg.GetMapE(path)
+	if err != nil {
+		return make(map[string]interface{})
+	}
+	return m
+}
+
+func (cfg *Config) GetStringMapE(path string) (map[string]string, error) {
+	v, err := cfg.getValue(path)
+	if err != nil {
+		return nil, err
+	}
+	val, err := cast.ToStringMapStringE(v)
+	return val, NewValueError(path, err)
+}
+
+func (cfg *Config) GetStringMap(path string) map[string]string {
+	m, err := cfg.GetStringMapE(path)
+	if err != nil {
+		return make(map[string]string)
+	}
+	return m
+}
+
+func (cfg *Config) GetMapSliceE(path string) ([]map[string]interface{}, error) {
+	val, err := cfg.GetSliceE(path)
+	if err != nil {
+		return nil, err
+	}
+	l := make([]map[string]interface{}, len(val))
+	for i, v := range val {
+		m, err := cast.ToStringMapE(v)
+		if err != nil {
+			return nil, NewValueError(fmt.Sprintf("%s.%d", path, i), err)
+		}
+		l[i] = m
+	}
+	return l, nil
+}
+
+func (cfg *Config) GetMapSlice(path string) []map[string]interface{} {
+	l, err := cfg.GetMapSliceE(path)
+	if err != nil {
+		return make([]map[string]interface{}, 0)
+	}
+	return l
+}
+
+// GetConfigSliceE returns a slice of Config objects that can be accessed with the
+// other methods
+func (cfg *Config) GetConfigSliceE(path string) ([]*Config, error) {
+	list := make([]*Config, 0)
+	l, err := cfg.GetSliceE(path)
+	if err != nil {
+		return nil, err
+	}
+	for i, _ := range l {
+		if c, ok := cfg.CheckGet(fmt.Sprintf("%s.%d", path, i)); ok {
+			list = append(list, c)
+		}
+	}
+	return list, nil
+}
+
+func (cfg *Config) GetConfigSlice(path string) []*Config {
+	l, err := cfg.GetConfigSliceE(path)
+	if err != nil {
+		return make([]*Config, 0)
+	}
+	return l
+}
+
+// GetConfigMapE returns a map of Config objects that can be accessed with the
+// other methods
+func (cfg *Config) GetConfigMapE(path string) (map[string]*Config, error) {
+	cm := make(map[string]*Config)
+	m, err := cfg.GetMapE(path)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, _ := range m {
+		if c, ok := cfg.CheckGet(fmt.Sprintf("%s.%d", path, m)); ok {
+			cm[k] = c
+		}
+	}
+	return cm, nil
+}
+
+func (cfg *Config) GetConfigMap(path string) map[string]*Config {
+	m, err := cfg.GetConfigMapE(path)
+	if err != nil {
+		return make(map[string]*Config)
+	}
+	return m
+}
+
+func (cfg *Config) GetURLE(path string) (*url.URL, error) {
+	rawurl, err := cfg.GetStringE(path)
 	if err != nil {
 		return nil, err
 	}
 	return url.Parse(rawurl)
 }
 
+func (cfg *Config) GetURL(path string) *url.URL {
+	u, err := cfg.GetURLE(path)
+	if err != nil {
+		return nil
+	}
+	return u
+}
+
 // ParseYAML creates a new config from a yaml file
 func ParseYaml(r io.Reader) (*Config, error) {
-	var buf bytes.Buffer
-	_, err := buf.ReadFrom(r)
+	// Replace tabs with spaces
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	text := buf.String()
-
-	formatted := strings.Replace(strings.TrimSpace(text), "\t", "    ", -1)
-	c, err := config.ParseYaml(formatted)
-	if err != nil {
-		return nil, err
-	}
-
+	b = bytes.Replace(b, []byte("\t"), []byte("    "), -1)
 	cfg := New()
-	cfg.Config = c
-	return cfg, nil
+	cfg.Viper.SetConfigType("yaml")
+	err = cfg.Viper.ReadConfig(bytes.NewReader(b))
+	return cfg, err
 }
 
 // Must panics if there is an error
@@ -312,6 +346,20 @@ func FromContext(ctx context.Context) *Config {
 	} else {
 		return New()
 	}
+}
+
+// Map returns the config as a map[string]interface
+func (cfg *Config) Map() map[string]interface{} {
+	return cfg.AllSettings()
+}
+
+// StringMap returns the config as a map with string values
+func (cfg *Config) StringMap() map[string]string {
+	m := make(map[string]string)
+	for k, v := range cfg.Map() {
+		m[k] = fmt.Sprint(v)
+	}
+	return m
 }
 
 // String implements the Stringer interface

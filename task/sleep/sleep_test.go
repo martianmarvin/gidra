@@ -12,12 +12,13 @@ import (
 )
 
 var taskCfg = `
-seconds: 5
+duration: 5s
 `
 
 func TestSleep(t *testing.T) {
 	r := strings.NewReader(taskCfg)
 	cfg := config.Must(config.ParseYaml(r))
+	t.Log(cfg.GetDuration("duration"))
 
 	tsk := task.New("sleep")
 	ctx := config.ToContext(context.Background(), cfg)

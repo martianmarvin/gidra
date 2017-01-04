@@ -9,8 +9,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/structs"
-	"github.com/imdario/mergo"
-	"github.com/martianmarvin/gidra"
 	"github.com/martianmarvin/gidra/config"
 )
 
@@ -54,9 +52,6 @@ func (c *configurable) String() string {
 func (c *configurable) Configure(cfg *config.Config) error {
 	var err error
 
-	// map of task vars to use as options with task config struct
-	opts := make(map[string]interface{})
-
 	// Validate all fields tagged required decoded successfully
 	configStruct := structs.New(c.config)
 	for _, f := range configStruct.Fields() {
@@ -66,75 +61,69 @@ func (c *configurable) Configure(cfg *config.Config) error {
 		k := changeInitialCase(f.Name(), unicode.ToLower)
 		tag := f.Tag(configTag)
 		name, flags := parseFieldTag(tag)
-		if len(name) == 0 {
-			name = k
-		}
-		// Fix for Mergo zero value issue
-		if !f.IsZero() {
-			opts[k] = f.Value()
-			f.Zero()
+		if len(name) > 0 {
+			cfg.RegisterAlias(name, k)
 		}
 
-		cf, ok := cfg.CheckGet(name)
+		ok := cfg.IsSet(k)
 		if !ok {
 			if flags.IsSet(config.FieldRequired) {
-				return gidra.FieldError{name}
-			} else {
-				continue
+				return config.FieldError{name}
 			}
-		}
-
-		// Special case to correctly parse stdlib custom types
-		opts[k], err = parseType(cf, f)
-		if err != nil {
-			return gidra.ValueError{name, err}
 		}
 	}
 
-	err = mergo.MapWithOverwrite(c.config, opts)
-	if err != nil {
-		return err
+	// Try to unmarshal with config default
+	cfg.Unmarshal(c.config)
+
+	for _, f := range configStruct.Fields() {
+		// If viper could not unmarshal, we take over
+		if f.IsExported() && f.IsZero() {
+			val := parseType(cfg, f)
+			err = f.Set(val)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
 }
 
 // Parse custom stdlib type supported by config
-func parseType(cf *config.Config, f *structs.Field) (interface{}, error) {
+func parseType(cf *config.Config, f *structs.Field) interface{} {
+	key := strings.ToLower(f.Name())
 	switch f.Value().(type) {
 	case time.Duration:
-		return cf.Duration("")
+		return cf.GetDuration(key)
 	case *url.URL:
-		return cf.URL("")
+		return cf.GetURL(key)
 	case int:
-		return cf.Int("")
+		return cf.GetInt(key)
 	case int32:
-		i, err := cf.Int("")
-		return int32(i), err
+		return int32(cf.GetInt(key))
 	case int64:
-		i, err := cf.Int("")
-		return int64(i), err
+		return cf.GetInt64(key)
 	case float64:
-		return cf.Float64("")
+		return cf.GetFloat64(key)
 	case bool:
-		return cf.Bool("")
+		return cf.GetBool(key)
 	case string:
-		return cf.String("")
+		return cf.GetString(key)
 	case []byte:
-		s, err := cf.String("")
-		return []byte(s), err
+		return []byte(cf.GetString(key))
 	case []string:
-		return cf.StringList("")
+		return cf.GetStringSlice(key)
 	case []map[string]interface{}:
-		return cf.MapList("")
+		return cf.GetMapSlice(key)
 	case []interface{}:
-		return cf.List("")
+		return cf.GetSlice(key)
 	case map[string]string:
-		return cf.StringMap("")
+		return cf.GetStringMap(key)
 	case map[string]interface{}:
-		return cf.Map("")
+		return cf.GetMap(key)
 	default:
-		return cf.Root, nil
+		return cf.GetInterface(key)
 	}
 }
 

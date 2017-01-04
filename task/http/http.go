@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/url"
 
-	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/valyala/fasthttp"
@@ -37,7 +36,7 @@ type Config struct {
 
 	FollowRedirects bool
 
-	Proxy *client.URLList
+	Proxy *url.URL
 }
 
 func (t *Task) Execute(ctx context.Context) (err error) {
