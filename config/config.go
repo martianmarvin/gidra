@@ -11,7 +11,10 @@ import (
 	"strings"
 	"time"
 
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/olebedev/config"
+	"github.com/spf13/viper"
 )
 
 type contextKey int
@@ -21,17 +24,26 @@ const (
 )
 
 // The default top level config object
-var cfg *Config
+var Default *Config
+
+func init() {
+	viper.SetConfigType("yaml")
+	Default = New()
+	err := Default.ReadConfig(strings.NewReader(defaultConfig))
+	if err != nil {
+		panic(err.Error())
+	}
+}
 
 // Config wraps the config.Config struct with additional helper methods
 type Config struct {
-	*config.Config
+	*viper.Viper
 }
 
 // New initializes a new Config
 func New() *Config {
 	return &Config{
-		Config: &config.Config{},
+		Viper: viper.New(),
 	}
 }
 
@@ -95,11 +107,7 @@ func (cfg *Config) Get(path string, def *Config) *Config {
 
 // CheckGet returns the config at path, or false if it does not exist
 func (cfg *Config) CheckGet(path string) (*Config, bool) {
-	subcfg, err := cfg.Config.Get(path)
-	if err != nil {
-		return nil, false
-	}
-	return &Config{Config: subcfg}, true
+	return &Config{Viper: cfg.Viper.Sub(path)}, cfg.Viper.IsSet(path)
 }
 
 // StringMap returns a map with string values
@@ -290,16 +298,6 @@ func Must(cfg *Config, err error) *Config {
 	return cfg
 }
 
-func init() {
-	r := strings.NewReader(defaultConfig)
-	cfg = Must(ParseYaml(r))
-}
-
-// Default returns the default config
-func Default() *Config {
-	return cfg
-}
-
 // ToContext returns a context with the provided config merged into the one in
 // the context
 func ToContext(ctx context.Context, cfg *Config) context.Context {
@@ -316,8 +314,11 @@ func FromContext(ctx context.Context) *Config {
 	}
 }
 
-// ToString implements the Stringer interface
-func (cfg *Config) ToString() string {
-	s, _ := config.RenderYaml(cfg.Config.Root)
-	return s
+// String implements the Stringer interface
+func (cfg *Config) String() string {
+	b, err := yaml.Marshal(cfg.AllSettings())
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
