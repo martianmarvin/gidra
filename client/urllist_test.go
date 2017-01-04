@@ -13,7 +13,7 @@ func TestURLList(t *testing.T) {
 	assert := assert.New(t)
 
 	l := NewURLList()
-	l.Append(testurls...)
+	l.AppendString(testurls...)
 
 	assert.Equal(l.Len(), len(testurls))
 
