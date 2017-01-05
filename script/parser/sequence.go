@@ -2,7 +2,9 @@ package parser
 
 import (
 	"context"
+	"errors"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/script/options"
@@ -21,7 +23,7 @@ func init() {
 func beforeSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 	// Only one before sequence is allowed
 	if s.BeforeSequence != nil {
-		return config.KeyError{cfgSeqBefore}
+		return config.KeyError{Name: cfgSeqBefore, Err: errors.New("Only one before sequence is allowed")}
 	}
 	taskList, err := cfg.GetConfigSliceE(cfgSeqBefore)
 	if err != nil {
@@ -39,7 +41,7 @@ func beforeSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 
 func mainSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 	if s.MainSequence != nil {
-		return config.KeyError{cfgSeqTasks}
+		return config.KeyError{Name: cfgSeqTasks, Err: config.ErrRequired}
 	}
 	taskList, err := cfg.GetConfigSliceE(cfgSeqTasks)
 	if err != nil {
@@ -58,7 +60,7 @@ func mainSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 func afterSeqParser(s *options.ScriptOptions, cfg *config.Config) error {
 	// Only one after sequence is allowed
 	if s.AfterSequence != nil {
-		return config.KeyError{cfgSeqAfter}
+		return config.KeyError{Name: cfgSeqAfter, Err: errors.New("Only one finally sequence is allowed")}
 	}
 	taskList, err := cfg.GetConfigSliceE(cfgSeqAfter)
 	if err != nil {
@@ -112,6 +114,7 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 		tsk := task.New(taskName)
 		seq.Add(tsk, taskConds, taskcfg)
 	}
+	spew.Dump(seq)
 	return seq, nil
 }
 
@@ -142,13 +145,13 @@ func parseCondition(key string, cfg *config.Config) (condition.Condition, error)
 	case cfgTaskFailCond:
 		cond = condition.NewFail(callbacks...)
 	default:
-		return nil, config.KeyError{key}
+		return nil, config.KeyError{Name: key}
 	}
 
 	ck := key + "." + cfgTaskCond
 	tmpl, err := cfg.GetStringE(ck)
 	if err != nil {
-		return nil, config.KeyError{ck}
+		return nil, config.KeyError{Name: ck}
 	}
 
 	err = cond.Parse(tmpl)

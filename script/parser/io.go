@@ -40,7 +40,7 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 	for _, input := range inputs {
 		source, ok := input[cfgIOSource].(string)
 		if !ok || len(source) == 0 {
-			return nil, config.FieldError{cfgIOSource}
+			return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
 		}
 
 		adapter, ok := input[cfgIOAdapter].(string)
@@ -59,7 +59,7 @@ func parseInput(inputs []map[string]interface{}) (map[string]datasource.Readable
 				}
 				readers["main"] = reader
 			} else {
-				return nil, config.FieldError{cfgIOVars}
+				return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
 			}
 		} else {
 			reader, err := datasource.FromFileType(source, adapter)
@@ -88,7 +88,7 @@ func outputParser(s *options.ScriptOptions, cfg *config.Config) error {
 func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error) {
 	source, ok := output[cfgIOSource].(string)
 	if !ok || len(source) == 0 {
-		return nil, config.FieldError{cfgIOSource}
+		return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
 	}
 
 	adapter, ok := output[cfgIOAdapter].(string)
@@ -105,7 +105,7 @@ func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error)
 	}
 
 	if writer == nil {
-		return nil, config.FieldError{cfgIOSource}
+		return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
 	}
 
 	return outputWriter(adapter, writer)

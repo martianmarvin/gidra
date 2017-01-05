@@ -37,7 +37,7 @@ func parseURLList(key string, cfg *config.Config) (*client.URLList, error) {
 	if err == nil {
 		source, ok := m[cfgIOSource]
 		if !ok {
-			return nil, config.FieldError{cfgIOSource}
+			return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
 		}
 		lines, err := datasource.ReadLines(source)
 		if err != nil {

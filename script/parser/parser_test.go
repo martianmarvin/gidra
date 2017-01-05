@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	// Register datasource and task types
-	"github.com/davecgh/go-spew/spew"
+
 	_ "github.com/martianmarvin/gidra/datasource/all"
 	_ "github.com/martianmarvin/gidra/task/all"
 
@@ -64,11 +64,11 @@ func TestParser(t *testing.T) {
 	sequences[2] = opts.AfterSequence
 
 	for i, seq := range sequences {
-		assert.NotNil(seq)
+		require.NotNil(seq)
 		n := len(subcfgs[i])
 		assert.Len(seq.Tasks, n)
 	}
 
-	spew.Dump(opts)
+	// spew.Dump(opts)
 
 }

@@ -2,6 +2,8 @@ package config
 
 // Default config. Overridden from script file or environment
 var defaultConfig = `
+version: '1'
+
 config:
 	verbosity: 4
 	threads: 100

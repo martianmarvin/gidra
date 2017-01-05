@@ -68,7 +68,7 @@ func (c *configurable) Configure(cfg *config.Config) error {
 		ok := cfg.IsSet(k)
 		if !ok {
 			if flags.IsSet(config.FieldRequired) {
-				return config.FieldError{name}
+				return config.KeyError{Name: name, Err: config.ErrRequired}
 			}
 		}
 	}

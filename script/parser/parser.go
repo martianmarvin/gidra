@@ -87,7 +87,7 @@ func Configure(s *options.ScriptOptions, cfg *config.Config) error {
 			continue
 		}
 		if !cfg.IsSet(key) {
-			return config.KeyError{key}
+			return config.KeyError{Name: key}
 		}
 		err := parser(s, cfg)
 		if err != nil {
@@ -104,16 +104,14 @@ func wrapParser(key string, fn ParseFunc) ParseFunc {
 		err := fn(s, cfg)
 
 		if err == nil {
-			return err
+			return nil
 		}
-		entry := Logger.WithField("type", "Unknown").WithField("key", key)
+		entry := Logger.WithField("type", "Unknown")
 		switch err := err.(type) {
-		case config.FieldError:
-			entry = entry.WithField("type", "FieldError").WithField("field", err.Name)
 		case config.KeyError:
-			entry = entry.WithField("type", "KeyError").WithField("key", err.Name)
+			entry = entry.WithField("type", "KeyError").WithField("key", err.Name).WithField("key", key).WithField("error", err.Err)
 		case config.ValueError:
-			entry = entry.WithField("type", "ValueError").WithField("value", err.Name)
+			entry = entry.WithField("type", "ValueError").WithField("value", err.Name).WithField("key", key).WithField("error", err.Err)
 		}
 		entry.Error(err)
 

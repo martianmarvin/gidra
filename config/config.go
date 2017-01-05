@@ -39,6 +39,12 @@ func init() {
 // Config wraps the config.Config struct with additional helper methods
 type Config struct {
 	*viper.Viper
+
+	// Line number of the master config file we are parsing
+	line int
+
+	// Last error message
+	Error error
 }
 
 // New initializes a new Config
@@ -60,15 +66,59 @@ func (cfg *Config) Extend(newcfg *Config) (*Config, error) {
 	return cfg, err
 }
 
+func (cfg *Config) get(path string) *Config {
+	_, n := cfg.findLine(path)
+	subcfg := New()
+	subcfg.line = cfg.line + n
+	c := cfg.Viper.Sub(path)
+	if c == nil {
+		subcfg.Error = cfg.keyError(path)
+		return subcfg
+	}
+	subcfg.Viper = c
+	return subcfg
+}
+
+// FIXME doens't work
+// Find line number of the specific path and the line
+func (cfg *Config) findLine(path string) (string, int) {
+	var line string
+	var n int
+	nl := "\n"
+
+	subcfg := &Config{Viper: cfg.Viper.Sub(path)}
+	if subcfg.Viper == nil {
+		return "", 0
+	}
+	s := cfg.String()
+	pos := strings.Index(s, subcfg.String())
+	if pos < 0 {
+		return "", 0
+	}
+	n = strings.Count(s[:pos], nl)
+	lines := strings.SplitN(s[pos:], nl, 2)
+	if len(lines) > 0 {
+		line = lines[0]
+	}
+	return line, n
+}
+
+// Format a keyerror on path
+func (cfg *Config) keyError(path string) KeyError {
+	line, n := cfg.findLine(path)
+	return KeyError{Name: path, Line: fmt.Sprintf("%d: %s", n, line)}
+}
+
 // Get the underlying value or return an error
 func (cfg *Config) getValue(path string) (interface{}, error) {
 	if cfg.Viper == nil || len(path) == 0 {
-		return nil, KeyError{path}
+		return nil, KeyError{Name: path}
 	}
-	if !cfg.Viper.InConfig(path) {
-		return nil, FieldError{path}
+	v := cfg.Viper.Get(path)
+	if v == nil {
+		return nil, KeyError{Name: path}
 	}
-	return cfg.Viper.Get(path), nil
+	return v, nil
 }
 
 // Get returns the config at path, or the default if not found
@@ -82,7 +132,7 @@ func (cfg *Config) Get(path string, def *Config) *Config {
 
 // CheckGet returns the config at path, or false if it does not exist
 func (cfg *Config) CheckGet(path string) (*Config, bool) {
-	return &Config{Viper: cfg.Viper.Sub(path)}, cfg.Viper.IsSet(path)
+	return cfg.get(path), cfg.IsSet(path)
 }
 
 // GetInterface returns the value as an interface{} without casting
@@ -249,14 +299,20 @@ func (cfg *Config) GetMapSlice(path string) []map[string]interface{} {
 // other methods
 func (cfg *Config) GetConfigSliceE(path string) ([]*Config, error) {
 	list := make([]*Config, 0)
-	l, err := cfg.GetSliceE(path)
+	_, n := cfg.findLine(path)
+	l, err := cfg.GetMapSliceE(path)
 	if err != nil {
-		return nil, err
+		e := cfg.keyError(path)
+		e.Err = err
+		return nil, e
 	}
-	for i, _ := range l {
-		if c, ok := cfg.CheckGet(fmt.Sprintf("%s.%d", path, i)); ok {
-			list = append(list, c)
+	for _, cm := range l {
+		subcfg := New()
+		subcfg.line = n //TODO calculate line offset for slice
+		for k, v := range cm {
+			subcfg.Set(k, v)
 		}
+		list = append(list, subcfg)
 	}
 	return list, nil
 }
@@ -275,11 +331,13 @@ func (cfg *Config) GetConfigMapE(path string) (map[string]*Config, error) {
 	cm := make(map[string]*Config)
 	m, err := cfg.GetMapE(path)
 	if err != nil {
-		return nil, err
+		e := cfg.keyError(path)
+		e.Err = err
+		return nil, e
 	}
 
 	for k, _ := range m {
-		if c, ok := cfg.CheckGet(fmt.Sprintf("%s.%d", path, m)); ok {
+		if c, ok := cfg.CheckGet(fmt.Sprintf("%s.%s", path, k)); ok {
 			cm[k] = c
 		}
 	}
@@ -317,7 +375,7 @@ func ParseYaml(r io.Reader) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	b = bytes.Replace(b, []byte("\t"), []byte("    "), -1)
+	b = bytes.Replace(b, []byte("\t"), []byte("  "), -1)
 	cfg := New()
 	cfg.Viper.SetConfigType("yaml")
 	err = cfg.Viper.ReadConfig(bytes.NewReader(b))
