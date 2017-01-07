@@ -133,6 +133,9 @@ func (cfg *Config) getValue(path string) (interface{}, error) {
 
 // Get returns the config at path, or the default if not found
 func (cfg *Config) Get(path string, def *Config) *Config {
+	if def == nil {
+		def = New()
+	}
 	c, ok := cfg.CheckGet(path)
 	if !ok {
 		return def

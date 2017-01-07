@@ -57,7 +57,6 @@ func TestParser(t *testing.T) {
 	subcfgs[1] = cfg.GetConfigSlice(cfgSeqTasks)
 	subcfgs[2] = cfg.GetConfigSlice(cfgSeqAfter)
 
-	//TODO fix sequence parsing
 	sequences := make([]*sequence.Sequence, 3)
 	sequences[0] = opts.BeforeSequence
 	sequences[1] = opts.MainSequence
@@ -69,6 +68,8 @@ func TestParser(t *testing.T) {
 		assert.Len(seq.Tasks, n)
 	}
 
-	// spew.Dump(opts)
+	// Update tests below if template.yaml changes
+	assert.Equal("http://icanhazip.com", opts.BeforeSequence.Configs[0].GetString("url"))
+	assert.Equal("http://www.example.com", opts.MainSequence.Configs[2].GetString("headers.referer"))
 
 }
