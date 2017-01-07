@@ -3,12 +3,14 @@
 package config
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -40,8 +42,11 @@ func init() {
 type Config struct {
 	*viper.Viper
 
-	// Line number of the master config file we are parsing
-	line int
+	// Original config text
+	text []byte
+
+	// Path from the master config, if this is a sub config
+	path string
 
 	// Last error message
 	Error error
@@ -67,9 +72,9 @@ func (cfg *Config) Extend(newcfg *Config) (*Config, error) {
 }
 
 func (cfg *Config) get(path string) *Config {
-	_, n := cfg.findLine(path)
 	subcfg := New()
-	subcfg.line = cfg.line + n
+	subcfg.path = cfg.path + "." + path
+	subcfg.text = cfg.text
 	c := cfg.Viper.Sub(path)
 	if c == nil {
 		subcfg.Error = cfg.keyError(path)
@@ -84,22 +89,27 @@ func (cfg *Config) get(path string) *Config {
 func (cfg *Config) findLine(path string) (string, int) {
 	var line string
 	var n int
-	nl := "\n"
 
-	subcfg := &Config{Viper: cfg.Viper.Sub(path)}
-	if subcfg.Viper == nil {
+	s := cfg.text
+	if len(cfg.text) == 0 {
 		return "", 0
 	}
-	s := cfg.String()
-	pos := strings.Index(s, subcfg.String())
-	if pos < 0 {
-		return "", 0
+	parts := strings.Split(path, ".")
+
+	i := 0
+	scanner := bufio.NewScanner(bytes.NewReader(s))
+	for scanner.Scan() {
+		n++
+		re := regexp.MustCompile(parts[i] + `:`)
+		line = scanner.Text()
+		if re.MatchString(line) {
+			i += 1
+			if i >= len(parts) {
+				break
+			}
+		}
 	}
-	n = strings.Count(s[:pos], nl)
-	lines := strings.SplitN(s[pos:], nl, 2)
-	if len(lines) > 0 {
-		line = lines[0]
-	}
+
 	return line, n
 }
 
@@ -299,7 +309,6 @@ func (cfg *Config) GetMapSlice(path string) []map[string]interface{} {
 // other methods
 func (cfg *Config) GetConfigSliceE(path string) ([]*Config, error) {
 	list := make([]*Config, 0)
-	_, n := cfg.findLine(path)
 	l, err := cfg.GetMapSliceE(path)
 	if err != nil {
 		e := cfg.keyError(path)
@@ -308,7 +317,8 @@ func (cfg *Config) GetConfigSliceE(path string) ([]*Config, error) {
 	}
 	for _, cm := range l {
 		subcfg := New()
-		subcfg.line = n //TODO calculate line offset for slice
+		subcfg.text = cfg.text
+		subcfg.path = cfg.path + "." + path
 		for k, v := range cm {
 			subcfg.Set(k, v)
 		}
@@ -378,6 +388,7 @@ func ParseYaml(r io.Reader) (*Config, error) {
 	b = bytes.Replace(b, []byte("\t"), []byte("  "), -1)
 	cfg := New()
 	cfg.Viper.SetConfigType("yaml")
+	cfg.text = b
 	err = cfg.Viper.ReadConfig(bytes.NewReader(b))
 	return cfg, err
 }

@@ -5,13 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var testCfg = `
-version: '1'
+var testCfg = `version: '1'
 config:
   verbosity: 4
   threads: 100
@@ -42,7 +40,7 @@ tasks:
       as: csrf_token
 `
 
-func TestConfig(t *testing.T) {
+func TestParse(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 	f := strings.NewReader(testCfg)
@@ -60,13 +58,21 @@ func TestConfig(t *testing.T) {
 	subcfgs, err := cfg.GetConfigSliceE("before")
 	assert.NoError(err)
 	assert.Len(subcfgs, 2)
-	spew.Dump(subcfgs[0])
 	u, err := subcfgs[0].GetURLE("get.url")
 	assert.NoError(err)
 	require.NotNil(u)
 	assert.Equal("http://icanhazip.com", u.String())
 	assert.Equal("ip", subcfgs[1].GetString("extract.as"))
+}
+
+func TestError(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	f := strings.NewReader(testCfg)
+	cfg, err := ParseYaml(f)
+	require.NoError(err)
 
 	line, n := cfg.findLine("config.task_timeout")
-	t.Log(line, n)
+	assert.Equal(6, n)
+	assert.Contains(line, "task_timeout")
 }
