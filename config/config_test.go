@@ -13,7 +13,6 @@ var testCfg = `version: '1'
 config:
   verbosity: 4
   threads: 100
-  loop: 1
   task_timeout: 15s
 inputs:
   - source: ./test/in.csv
@@ -47,6 +46,9 @@ func TestParse(t *testing.T) {
 	cfg, err := ParseYaml(f)
 	require.NoError(err)
 
+	cfg, err = cfg.Extend(Default)
+	require.NoError(err)
+
 	assert.Equal("1", cfg.GetString("version"))
 
 	subcfg, ok := cfg.CheckGet("config")
@@ -54,6 +56,7 @@ func TestParse(t *testing.T) {
 	duration, err := subcfg.GetDurationE("task_timeout")
 	assert.NoError(err)
 	assert.Equal(15*time.Second, duration)
+	assert.Equal(subcfg.GetInt("loop"), 1)
 
 	subcfgs, err := cfg.GetConfigSliceE("before")
 	assert.NoError(err)
@@ -72,7 +75,10 @@ func TestError(t *testing.T) {
 	cfg, err := ParseYaml(f)
 	require.NoError(err)
 
+	cfg, err = cfg.Extend(Default)
+	require.NoError(err)
+
 	line, n := cfg.findLine("config.task_timeout")
-	assert.Equal(6, n)
+	assert.Equal(5, n)
 	assert.Contains(line, "task_timeout")
 }

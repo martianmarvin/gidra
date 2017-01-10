@@ -83,9 +83,6 @@ func (s *Script) Load(cfg *config.Config) error {
 		return err
 	}
 
-	// FIXME Workaround for stupid config.Extend for now
-	// c.Set("tasks", cfg.UList("tasks"))
-
 	err = parser.Configure(s.Options, c)
 	if err != nil {
 		return err

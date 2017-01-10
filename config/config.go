@@ -30,9 +30,9 @@ const (
 var Default *Config
 
 func init() {
+	var err error
 	viper.SetConfigType("yaml")
-	Default = New()
-	err := Default.ReadConfig(strings.NewReader(defaultConfig))
+	Default, err = ParseYaml(strings.NewReader(defaultConfig))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -61,13 +61,12 @@ func New() *Config {
 
 // Extend merges the new config with this one
 func (cfg *Config) Extend(newcfg *Config) (*Config, error) {
-	cf := newcfg.String()
-	if len(cf) == 0 {
+	c := newcfg.String()
+	if len(c) == 0 {
 		return cfg, ErrParse
 	}
 
-	r := strings.NewReader(cf)
-	err := cfg.Viper.MergeConfig(r)
+	err := cfg.Viper.MergeConfig(strings.NewReader(c))
 	return cfg, err
 }
 
@@ -167,7 +166,10 @@ func (cfg *Config) GetStringE(path string) (string, error) {
 		return "", err
 	}
 	val, err := cast.ToStringE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetBoolE(path string) (bool, error) {
@@ -176,7 +178,10 @@ func (cfg *Config) GetBoolE(path string) (bool, error) {
 		return false, err
 	}
 	val, err := cast.ToBoolE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetIntE(path string) (int, error) {
@@ -185,7 +190,10 @@ func (cfg *Config) GetIntE(path string) (int, error) {
 		return 0, err
 	}
 	val, err := cast.ToIntE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetInt64E(path string) (int64, error) {
@@ -194,7 +202,10 @@ func (cfg *Config) GetInt64E(path string) (int64, error) {
 		return 0, err
 	}
 	val, err := cast.ToInt64E(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetFloat64E(path string) (float64, error) {
@@ -203,7 +214,10 @@ func (cfg *Config) GetFloat64E(path string) (float64, error) {
 		return 0.0, err
 	}
 	val, err := cast.ToFloat64E(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetTimeE(path string) (time.Time, error) {
@@ -212,7 +226,10 @@ func (cfg *Config) GetTimeE(path string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	val, err := cast.ToTimeE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetDurationE(path string) (time.Duration, error) {
@@ -221,7 +238,10 @@ func (cfg *Config) GetDurationE(path string) (time.Duration, error) {
 		return time.Duration(0), err
 	}
 	val, err := cast.ToDurationE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetSliceE(path string) ([]interface{}, error) {
@@ -230,7 +250,10 @@ func (cfg *Config) GetSliceE(path string) ([]interface{}, error) {
 		return nil, err
 	}
 	val, err := cast.ToSliceE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetSlice(path string) []interface{} {
@@ -247,7 +270,10 @@ func (cfg *Config) GetStringSliceE(path string) ([]string, error) {
 		return nil, err
 	}
 	val, err := cast.ToStringSliceE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetMapE(path string) (map[string]interface{}, error) {
@@ -256,7 +282,10 @@ func (cfg *Config) GetMapE(path string) (map[string]interface{}, error) {
 		return nil, err
 	}
 	val, err := cast.ToStringMapE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetMap(path string) map[string]interface{} {
@@ -273,7 +302,10 @@ func (cfg *Config) GetStringMapE(path string) (map[string]string, error) {
 		return nil, err
 	}
 	val, err := cast.ToStringMapStringE(v)
-	return val, NewValueError(path, err)
+	if err != nil {
+		err = ValueError{Name: path, Err: err}
+	}
+	return val, err
 }
 
 func (cfg *Config) GetStringMap(path string) map[string]string {
@@ -293,7 +325,8 @@ func (cfg *Config) GetMapSliceE(path string) ([]map[string]interface{}, error) {
 	for i, v := range val {
 		m, err := cast.ToStringMapE(v)
 		if err != nil {
-			return nil, NewValueError(fmt.Sprintf("%s.%d", path, i), err)
+			path := fmt.Sprintf("%s.%d", path, i)
+			return nil, ValueError{Name: path, Err: err}
 		}
 		l[i] = m
 	}

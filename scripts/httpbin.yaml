@@ -1,4 +1,5 @@
 tasks:
   - get:
       url: https://www.httpbin.org/get
-      success: '.Status == 200'
+      success:
+        when: '{{ eq .Page.Status 200 }}'

@@ -86,6 +86,7 @@ func Configure(s *options.ScriptOptions, cfg *config.Config) error {
 			// No parser registered for this key, skip
 			continue
 		}
+		Logger.WithField("key", key).Warn("Parsing")
 		if !cfg.IsSet(key) {
 			return config.KeyError{Name: key}
 		}
