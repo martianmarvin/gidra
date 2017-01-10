@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/global"
@@ -223,11 +222,11 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	log.SetLevel(opts.Verbosity)
 	ctx = log.ToContext(ctx, log.Logger())
 
-	// HTTP Client
-	if opts.HTTP != nil {
-		client := httpclient.New().WithOptions(opts.HTTP)
-		ctx = httpclient.ToContext(ctx, client)
-	}
+	// // HTTP Client
+	// if opts.HTTP != nil {
+	// 	client := httpclient.New().WithOptions(opts.HTTP)
+	// 	ctx = httpclient.ToContext(ctx, client)
+	// }
 
 	// Variables
 	scriptVars := vars.New()
@@ -241,12 +240,12 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	scriptVars.Set("task_timeout", opts.TaskTimeout)
 	scriptVars.Set("verbosity", opts.Verbosity)
 
-	scriptVars.Set("follow_redirects", opts.HTTP.FollowRedirects)
-	scriptVars.Set("proxy", opts.HTTP.Proxy)
-	scriptVars.Set("headers", opts.HTTP.Headers)
-	scriptVars.Set("params", opts.HTTP.Params)
-	scriptVars.Set("cookies", opts.HTTP.Cookies)
-	scriptVars.Set("body", opts.HTTP.Body)
+	// scriptVars.Set("follow_redirects", opts.HTTP.FollowRedirects)
+	// scriptVars.Set("proxy", opts.HTTP.Proxy)
+	// scriptVars.Set("headers", opts.HTTP.Headers)
+	// scriptVars.Set("params", opts.HTTP.Params)
+	// scriptVars.Set("cookies", opts.HTTP.Cookies)
+	// scriptVars.Set("body", opts.HTTP.Body)
 
 	ctx = vars.ToContext(ctx, scriptVars)
 
@@ -265,10 +264,6 @@ func configureGlobal(g *global.Global, opts *options.ScriptOptions) *global.Glob
 
 	if opts.Vars != nil {
 		g.Vars = opts.Vars.Map()
-	}
-
-	if opts.HTTP.Proxy != nil {
-		g.Proxy = opts.HTTP.Proxy
 	}
 
 	if len(opts.Input) > 0 {

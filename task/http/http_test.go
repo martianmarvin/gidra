@@ -3,24 +3,16 @@ package http
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/martianmarvin/gidra/client/httpclient"
+	"github.com/martianmarvin/gidra/client/mock"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-//Spins up a test HTTP server that prints the request
-func testServer() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Write(w)
-	}))
-}
 
 // Helper to run an http request
 func testReq(t *testing.T, tsk task.Task, conf string, expected ...string) {
@@ -48,7 +40,7 @@ func testReq(t *testing.T, tsk task.Task, conf string, expected ...string) {
 }
 
 func TestGet(t *testing.T) {
-	ts := testServer()
+	ts := mock.NewServer()
 	defer ts.Close()
 	conf := fmt.Sprintf("url: %s\n", ts.URL)
 	conf += `headers:
@@ -62,7 +54,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestPost(t *testing.T) {
-	ts := testServer()
+	ts := mock.NewServer()
 	defer ts.Close()
 	conf := fmt.Sprintf("url: %s\n", ts.URL)
 	conf += `headers:

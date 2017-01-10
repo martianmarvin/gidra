@@ -5,6 +5,8 @@ package client
 import (
 	"context"
 	"net"
+
+	"github.com/martianmarvin/gidra/config"
 )
 
 // Context key
@@ -18,6 +20,9 @@ const (
 
 // Client is the basic client to connect to an external resource
 type Client interface {
+	// Configure applies options to the client from the given *config.Config
+	Configure(cfg *config.Config) error
+
 	// Dial establishes a connection, optionally through the given proxy,
 	// and persists it on the client
 	Dial(addr string) (net.Conn, error)

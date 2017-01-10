@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/martianmarvin/gidra/datasource"
-	"github.com/martianmarvin/gidra/script/options/http"
 	"github.com/martianmarvin/gidra/sequence"
 	"github.com/martianmarvin/vars"
 )
@@ -24,9 +23,6 @@ type ScriptOptions struct {
 
 	// Timeout for each individual task
 	TaskTimeout time.Duration
-
-	// Defaults for the HTTP Client
-	HTTP *http.Options
 
 	// Global variables available to all tasks
 	Vars *vars.Vars
@@ -50,11 +46,6 @@ type ScriptOptions struct {
 // New initializes an empty set of options
 func New() *ScriptOptions {
 	return &ScriptOptions{
-		HTTP: &http.Options{
-			Headers: make(map[string]string),
-			Params:  make(map[string]string),
-			Cookies: make(map[string]string),
-		},
 		Vars:  vars.New(),
 		Input: make(map[string]datasource.ReadableTable),
 	}

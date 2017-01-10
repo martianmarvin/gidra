@@ -12,8 +12,8 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/martianmarvin/conn"
 	"github.com/martianmarvin/gidra/client"
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/fastcookiejar"
-	"github.com/martianmarvin/gidra/script/options/http"
 	"github.com/valyala/fasthttp"
 )
 
@@ -28,7 +28,7 @@ var defaultTimeout time.Duration = 15 * time.Second
 
 type Client struct {
 	// Options are globally applied to each request by the client
-	Options *http.Options
+	Options *Options
 
 	// The underlying connection
 	conn net.Conn
@@ -72,24 +72,36 @@ func New() *Client {
 		dialer:    conn.NewDialer(),
 		jar:       fastcookiejar.New(),
 		responses: make([]*fasthttp.Response, 0),
-		Options: &http.Options{
+		Options: &Options{
 			Timeout: defaultTimeout,
 		},
-	}
-	if c.Options.Proxy != nil {
-		c.dialer.Proxy = c.Options.Proxy
 	}
 	c.client.Dial = c.dialer.FastDial
 	return c
 }
 
-// WithOptions applies settings from the Options struct to this client
-func (c *Client) WithOptions(opts *http.Options) *Client {
-	mergo.MergeWithOverwrite(c.Options, opts)
-	// Add cookies to jar for all domains
+// Configure applies relevant options from the given config to this client
+// TODO Check for errors on each config option
+func (c *Client) Configure(cfg *config.Config) error {
+	opts := &Options{
+		URL:             cfg.GetURL(cfgURL),
+		FollowRedirects: cfg.GetBool(cfgFollowRedirects),
+		Timeout:         cfg.GetDuration(cfgTimeout),
+		Proxy:           cfg.GetURL(cfgProxy),
+		Headers:         cfg.GetStringMap(cfgHeaders),
+		Params:          cfg.GetStringMap(cfgParams),
+		Cookies:         cfg.GetStringMap(cfgCookies),
+		Body:            []byte(cfg.GetString(cfgBody)),
+	}
+	err := mergo.MergeWithOverwrite(c.Options, opts)
+	if err != nil {
+		return err
+	}
 	c.jar.SetMap(".", c.Options.Cookies)
-	return c
-
+	if c.Options.Proxy != nil {
+		c.dialer.Proxy = c.Options.Proxy
+	}
+	return nil
 }
 
 func (c *Client) Dial(addr string) (net.Conn, error) {

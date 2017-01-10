@@ -28,16 +28,16 @@ vars:
   host: https://www.example.com
 before:
   - get:
-    url: http://www.example.com/
+      url: http://www.example.com/
   - sleep:
-    duration: 2s
+      duration: 2s
 tasks:
   - get:
-    url: http://www.example.com/get
-    headers:
-      h1: v2
+      url: http://www.example.com/get
+      headers:
+        h1: v2
   - post:
-    url: http://www.example.com/post
+      url: http://www.example.com/post
 `,
 }
 
@@ -45,7 +45,7 @@ func TestLoad(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	for i, scr := range testScripts[:1] {
+	for i, scr := range testScripts {
 		msg := fmt.Sprintf("test script #%d \n%20s", i, scr)
 		var buf bytes.Buffer
 
