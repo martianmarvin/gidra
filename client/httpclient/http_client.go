@@ -6,12 +6,14 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/http/httptest"
 	"net/url"
 	"time"
 
 	"github.com/imdario/mergo"
 	"github.com/martianmarvin/conn"
 	"github.com/martianmarvin/gidra/client"
+	"github.com/martianmarvin/gidra/client/mock"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/fastcookiejar"
 	"github.com/valyala/fasthttp"
@@ -47,6 +49,9 @@ type Client struct {
 
 	// page is the most recent page requested by this client
 	page *client.Page
+
+	//Test endpoint for simulated requests
+	TestServer *httptest.Server
 }
 
 // ToContext attaches a client to this context
@@ -92,6 +97,7 @@ func (c *Client) Configure(cfg *config.Config) error {
 		Params:          cfg.GetStringMap(cfgParams),
 		Cookies:         cfg.GetStringMap(cfgCookies),
 		Body:            []byte(cfg.GetString(cfgBody)),
+		Simulate:        cfg.GetBool(cfgSimulate),
 	}
 	err := mergo.MergeWithOverwrite(c.Options, opts)
 	if err != nil {
@@ -122,6 +128,9 @@ func (c *Client) Close() error {
 
 // Apply client's headers and cookies to request
 func (c *Client) buildRequest(req *fasthttp.Request) *fasthttp.Request {
+	if c.Options.URL != nil {
+		req.SetRequestURI(c.Options.URL.String())
+	}
 	//Apply global client headers if not in request
 	for k, v := range c.Options.Headers {
 		if len(req.Header.Peek(k)) == 0 {
@@ -129,10 +138,25 @@ func (c *Client) buildRequest(req *fasthttp.Request) *fasthttp.Request {
 		}
 	}
 
+	// Set params to query string
+	if len(c.Options.Params) > 0 {
+		args := fasthttp.AcquireArgs()
+		for k, v := range c.Options.Params {
+			args.Set(k, v)
+		}
+		req.Header.SetContentType("application/x-www-form-urlencoded")
+		args.WriteTo(req.BodyWriter())
+		fasthttp.ReleaseArgs(args)
+	}
+
 	//Apply cookies from jar
 	cookies := c.jar.Cookies(string(req.Host()))
 	for _, ck := range cookies {
 		req.Header.SetCookieBytesKV(ck.Key(), ck.Value())
+	}
+
+	if len(c.Options.Body) > 0 {
+		req.SetBody(c.Options.Body)
 	}
 	return req
 }
@@ -163,6 +187,15 @@ func (c *Client) Do(r interface{}) error {
 	requrl := req.URI().String()
 	redirects := make([]string, 0)
 	redirects = append(redirects, requrl)
+
+	if c.Options.Simulate {
+		if c.TestServer == nil {
+			c.TestServer = mock.NewServer()
+		}
+		tu, _ := url.Parse(c.TestServer.URL)
+		req.URI().SetHost(tu.Host)
+		requrl = req.URI().String()
+	}
 
 	for {
 		err = c.client.DoTimeout(req, resp, c.Options.Timeout)

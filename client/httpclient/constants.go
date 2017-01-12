@@ -11,4 +11,5 @@ var (
 	cfgCookies         = "cookies"
 	cfgJSON            = "json"
 	cfgBody            = "body"
+	cfgSimulate        = "simulate"
 )

@@ -23,4 +23,7 @@ type Options struct {
 
 	// Text body
 	Body []byte
+
+	// Print requests instead of executing them
+	Simulate bool
 }
