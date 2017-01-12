@@ -53,11 +53,11 @@ func TestSimulate(t *testing.T) {
 	req := &fasthttp.Request{}
 	err = client.Do(req)
 	assert.NoError(err)
-	resp, err := client.Response()
+	resp, err := client.Page()
 	assert.NoError(err)
 	assert.NotNil(resp)
-	text := string(resp)
+	body := resp.Body
 
-	assert.Contains(text, "/get")
-	assert.Contains(text, "v1")
+	assert.Contains(body, "/get")
+	assert.Contains(body, "v1")
 }
