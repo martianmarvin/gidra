@@ -175,6 +175,11 @@ func getRedirectURL(baseURL string, location []byte) string {
 func (c *Client) Do(r interface{}) error {
 	var err error
 
+	// Execute request with defaults set on client
+	if r == nil {
+		r = &fasthttp.Request{}
+	}
+
 	req, ok := r.(*fasthttp.Request)
 	if !ok {
 		return errors.New("This client can only execute a request of type *fasthttp.Request")
