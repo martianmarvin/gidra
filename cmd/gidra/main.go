@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -20,13 +19,12 @@ import (
 // Global config vars
 var (
 	cfgThreads int
-	cfgDryRun  bool
 	cfgQuiet   bool
 )
 
 func cmdRun(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Println("Failed to open script file")
+		fmt.Println("Usage: gidra run [options] SCRIPT\n\n")
 		os.Exit(1)
 	}
 
@@ -37,13 +35,6 @@ func cmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	s.Options.Threads = cfgThreads
-
-	if cfgDryRun {
-		var buf bytes.Buffer
-		s.DryRun(&buf)
-		fmt.Println(buf.String())
-		return
-	}
 
 	if s.Options.Output == nil {
 		// If no output specified, output tsv to Stdout
@@ -73,6 +64,21 @@ func cmdRun(cmd *cobra.Command, args []string) {
 	s.Run(ctx)
 }
 
+func cmdShow(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: gidra show [options] SCRIPT\n\n")
+		os.Exit(1)
+	}
+
+	s, err := script.OpenFile(args[0])
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	s.Show(os.Stdout)
+}
+
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "gidra",
@@ -89,8 +95,15 @@ func main() {
 	// runCmd.SetUsageTemplate("Usage: gidra run [options] SCRIPT\n\n")
 	runCmd.Flags().IntVarP(&cfgThreads, "threads", "t", 100, "number of concurrent threads to run tasks.")
 	runCmd.Flags().BoolVarP(&cfgQuiet, "quiet", "q", false, "Don't send results to standard output. Has no effect if an output is set.")
-	runCmd.Flags().BoolVar(&cfgDryRun, "dry-run", false, "Show tasks in script instead of running them.")
 	rootCmd.AddCommand(runCmd)
+
+	showCmd := &cobra.Command{
+		Use:   "show",
+		Short: "Show what HTTP requests would be made if the script ran",
+		Long:  "Show what HTTP requests would be made if the script ran",
+		Run:   cmdShow,
+	}
+	rootCmd.AddCommand(showCmd)
 
 	rootCmd.Execute()
 }

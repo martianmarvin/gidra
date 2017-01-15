@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -166,12 +167,28 @@ func (s *Script) enqueue() {
 // DryRun prints the tasks that would be executed by the script if it ran to
 // the given io.Writer, but
 // does not actually run any of them
-func (s *Script) DryRun(w io.Writer) {
-	n := (int(s.Options.Input["main"].Len()) * s.Options.MainSequence.Size())
-	fmt.Fprintf(w, "DRY RUN %d tasks\n", n)
-	s.enqueue()
-	for seq := range s.queue {
-		fmt.Fprint(w, seq)
+func (s *Script) Show(w io.Writer) {
+	ctx := configureContext(context.Background(), s.Options)
+	client, _ := httpclient.FromContext(ctx)
+	client.Options.Simulate = true
+
+	for _, seq := range s.sequences {
+		seq.Execute(ctx)
+	}
+	sep := "\r\n\r\n"
+	// Iterate and show responses
+	for {
+		//Pop off response
+		resp, err := client.Response()
+		if err != nil {
+			break
+		}
+		text := string(resp)
+		if !strings.Contains(text, sep) {
+			break
+		}
+		// Print body
+		fmt.Fprintln(w, strings.Split(text, sep)[1])
 	}
 }
 

@@ -6,7 +6,6 @@ vars:
 tasks:
   - get:
       url: http://httpbin.org/get
-      simulate: true
       headers:
         k1: '{{ .Vars.k1 }}'
   - print:
