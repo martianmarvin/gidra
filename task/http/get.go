@@ -7,11 +7,7 @@ func init() {
 }
 
 func NewGet() task.Task {
-	t := &Task{
-		Config: &Config{},
-		Worker: task.NewWorker(),
-	}
-	t.Configurable = task.NewConfigurable(t.Config)
+	t := newHTTP()
 	t.Config.Method = []byte("GET")
 	return t
 }

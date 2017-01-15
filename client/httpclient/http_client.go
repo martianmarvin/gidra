@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"net"
 	"net/http/httptest"
 	"net/url"
@@ -30,7 +29,7 @@ var defaultTimeout time.Duration = 15 * time.Second
 
 type Client struct {
 	// Options are globally applied to each request by the client
-	Options *Options
+	Options *client.HTTPOptions
 
 	// The underlying connection
 	conn net.Conn
@@ -77,8 +76,10 @@ func New() *Client {
 		dialer:    conn.NewDialer(),
 		jar:       fastcookiejar.New(),
 		responses: make([]*fasthttp.Response, 0),
-		Options: &Options{
-			Timeout: defaultTimeout,
+		Options: &client.HTTPOptions{
+			Options: &client.Options{
+				Timeout: defaultTimeout,
+			},
 		},
 	}
 	c.client.Dial = c.dialer.FastDial
@@ -93,16 +94,18 @@ func (c *Client) Configure(cfg *config.Config) error {
 	// TODO: How to deal with user override of global defaults? Just YAML
 	// parser?
 	cfg = config.Default.Get(cfgDefault, nil).Extend(cfg)
-	opts := &Options{
+	opts := &client.HTTPOptions{
 		URL:             cfg.GetURL(cfgURL),
 		FollowRedirects: cfg.GetBool(cfgFollowRedirects),
-		Timeout:         cfg.GetDuration(cfgTimeout),
-		Proxy:           cfg.GetURL(cfgProxy),
 		Headers:         cfg.GetStringMap(cfgHeaders),
 		Params:          cfg.GetStringMap(cfgParams),
 		Cookies:         cfg.GetStringMap(cfgCookies),
 		Body:            []byte(cfg.GetString(cfgBody)),
-		Simulate:        cfg.GetBool(cfgSimulate),
+		Options: &client.Options{
+			Timeout:  cfg.GetDuration(cfgTimeout),
+			Proxy:    cfg.GetURL(cfgProxy),
+			Simulate: cfg.GetBool(cfgSimulate),
+		},
 	}
 	err = mergo.MergeWithOverwrite(c.Options, opts)
 	if err != nil {
@@ -131,22 +134,26 @@ func (c *Client) Close() error {
 	return err
 }
 
-// Apply client's headers and cookies to request
-func (c *Client) buildRequest(req *fasthttp.Request) *fasthttp.Request {
-	if c.Options.URL != nil {
-		req.SetRequestURI(c.Options.URL.String())
+// Apply options to construct a request
+func (c *Client) buildRequest(opts *client.HTTPOptions) *fasthttp.Request {
+	req := fasthttp.AcquireRequest()
+	if opts.Method != nil {
+		req.Header.SetMethodBytes(opts.Method)
+	}
+	if opts.URL != nil {
+		req.SetRequestURI(opts.URL.String())
 	}
 	//Apply global client headers if not in request
-	for k, v := range c.Options.Headers {
+	for k, v := range opts.Headers {
 		if len(req.Header.Peek(k)) == 0 {
 			req.Header.Set(k, v)
 		}
 	}
 
 	// Set params to query string
-	if len(c.Options.Params) > 0 {
+	if len(opts.Params) > 0 {
 		args := fasthttp.AcquireArgs()
-		for k, v := range c.Options.Params {
+		for k, v := range opts.Params {
 			args.Set(k, v)
 		}
 		req.Header.SetContentType("application/x-www-form-urlencoded")
@@ -154,14 +161,17 @@ func (c *Client) buildRequest(req *fasthttp.Request) *fasthttp.Request {
 		fasthttp.ReleaseArgs(args)
 	}
 
-	//Apply cookies from jar
+	//Apply cookies from jar and request
 	cookies := c.jar.Cookies(string(req.Host()))
 	for _, ck := range cookies {
 		req.Header.SetCookieBytesKV(ck.Key(), ck.Value())
 	}
+	for k, v := range opts.Cookies {
+		req.Header.SetCookie(k, v)
+	}
 
-	if len(c.Options.Body) > 0 {
-		req.SetBody(c.Options.Body)
+	if len(opts.Body) > 0 {
+		req.SetBody(opts.Body)
 	}
 	return req
 }
@@ -175,22 +185,27 @@ func getRedirectURL(baseURL string, location []byte) string {
 	return redirectURL
 }
 
-//Do executes the request, applying all client-global options and returns the
+//Do executes a request with the specified options, applying all client-global options and returns the
 //response
-func (c *Client) Do(r interface{}) error {
+func (c *Client) Do(opts interface{}) error {
 	var err error
-
-	// Execute request with defaults set on client
-	if r == nil {
-		r = &fasthttp.Request{}
+	var ok bool
+	var reqOpts *client.HTTPOptions
+	if opts == nil {
+		reqOpts = &client.HTTPOptions{}
+	} else {
+		if reqOpts, ok = opts.(*client.HTTPOptions); !ok {
+			panic("This client can only execute HTTP requests")
+		}
 	}
 
-	req, ok := r.(*fasthttp.Request)
-	if !ok {
-		return errors.New("This client can only execute a request of type *fasthttp.Request")
+	err = mergo.Merge(reqOpts, c.Options)
+	if err != nil {
+		return err
 	}
 
-	req = c.buildRequest(req)
+	req := c.buildRequest(reqOpts)
+	defer fasthttp.ReleaseRequest(req)
 	resp := fasthttp.AcquireResponse()
 
 	//follow redirects, saving cookies along the way
@@ -198,7 +213,7 @@ func (c *Client) Do(r interface{}) error {
 	redirects := make([]string, 0)
 	redirects = append(redirects, requrl)
 
-	if c.Options.Simulate {
+	if reqOpts.Simulate {
 		if c.TestServer == nil {
 			c.TestServer = mock.NewServer()
 		}
@@ -208,7 +223,7 @@ func (c *Client) Do(r interface{}) error {
 	}
 
 	for {
-		err = c.client.DoTimeout(req, resp, c.Options.Timeout)
+		err = c.client.DoTimeout(req, resp, reqOpts.Timeout)
 		if err != nil {
 			break
 		}
@@ -216,7 +231,7 @@ func (c *Client) Do(r interface{}) error {
 		resp.Header.VisitAllCookie(c.jar.SetBytes)
 		statusCode := resp.Header.StatusCode()
 
-		if !c.Options.FollowRedirects ||
+		if !reqOpts.FollowRedirects ||
 			!(statusCode == 301 || statusCode == 302 || statusCode == 303) {
 			break
 		}
@@ -229,9 +244,7 @@ func (c *Client) Do(r interface{}) error {
 		req.SetRequestURI(requrl)
 	}
 
-	fasthttp.ReleaseRequest(req)
 	if err != nil {
-		fasthttp.ReleaseResponse(resp)
 		c.responses = append(c.responses, nil)
 	} else {
 		c.responses = append(c.responses, resp)
@@ -241,6 +254,23 @@ func (c *Client) Do(r interface{}) error {
 	}
 
 	return err
+}
+
+// Get simply fetches a page with the client default options
+func Get(requrl string) ([]byte, error) {
+	u, err := url.Parse(requrl)
+	if err != nil {
+		return nil, err
+	}
+	c := New()
+	c.Configure(config.Default)
+	c.Options.Method = []byte("GET")
+	c.Options.URL = u
+	err = c.Do(nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.Response()
 }
 
 //Response pops the latest response from this client's list of responses

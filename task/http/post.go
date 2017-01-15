@@ -7,11 +7,7 @@ func init() {
 }
 
 func NewPost() task.Task {
-	t := &Task{
-		Config: &Config{},
-		Worker: task.NewWorker(),
-	}
-	t.Configurable = task.NewConfigurable(t.Config)
+	t := newHTTP()
 	t.Config.Method = []byte("POST")
 	return t
 }

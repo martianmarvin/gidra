@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/global"
@@ -219,11 +220,13 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	log.SetLevel(opts.Verbosity)
 	ctx = log.ToContext(ctx, log.Logger())
 
-	// // HTTP Client
-	// if opts.HTTP != nil {
-	// 	client := httpclient.New().WithOptions(opts.HTTP)
-	// 	ctx = httpclient.ToContext(ctx, client)
-	// }
+	// HTTP Client, using an empty config for now as client already applies
+	// defaults
+	//TODO cleaner config
+	client := httpclient.New()
+	client.Configure(config.New())
+	ctx = httpclient.ToContext(ctx, client)
+	// Configure global client options
 
 	// Variables
 	scriptVars := vars.New()

@@ -5,6 +5,8 @@ package client
 import (
 	"context"
 	"net"
+	"net/url"
+	"time"
 
 	"github.com/martianmarvin/gidra/config"
 )
@@ -31,11 +33,21 @@ type Client interface {
 	Close() error
 
 	// Do executes a request and saves the response on the client
-	Do(req interface{}) error
+	Do(opts interface{}) error
 
 	// Response returns the full text of the last successful response from request made by
 	//this client as a byte array
 	Response() ([]byte, error)
+}
+
+// Options shared by all clients
+type Options struct {
+	Timeout time.Duration
+
+	Proxy *url.URL
+
+	// Print requests instead of executing them
+	Simulate bool
 }
 
 // ToContext attaches a client to this context

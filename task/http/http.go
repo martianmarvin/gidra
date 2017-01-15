@@ -3,16 +3,22 @@ package http
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
+	"strings"
 
+	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/client/httpclient"
 	"github.com/martianmarvin/gidra/task"
-	"github.com/valyala/fasthttp"
 )
 
 var (
 	ErrBadClient = errors.New("Invalid client, HTTPClient is required for this task")
 )
+
+func init() {
+	task.Register("http", New)
+}
 
 type Task struct {
 	task.Worker
@@ -24,22 +30,39 @@ type Task struct {
 type Config struct {
 	Method []byte
 
-	URL *url.URL `task:"url,required"`
+	URL *url.URL `task:"url, required"`
+
+	FollowRedirects bool `task:"follow_redirects"`
 
 	Headers map[string]string
 
-	Cookies map[string]string
-
 	Params map[string]string
 
+	Cookies map[string]string
+
+	// Text body
 	Body []byte
 
-	FollowRedirects bool
-
-	Proxy *url.URL
+	// JSON body
+	// TODO - marshal and save bytes in Body
+	Json map[string]string
 }
 
-func (t *Task) Execute(ctx context.Context) (err error) {
+func newHTTP() *Task {
+	t := &Task{
+		Config: &Config{},
+		Worker: task.NewWorker(),
+	}
+	t.Configurable = task.NewConfigurable(t.Config)
+	return t
+}
+
+func New() task.Task {
+	return newHTTP()
+}
+
+func (t *Task) Execute(ctx context.Context) error {
+	var err error
 
 	// Get client from the context
 	c, ok := httpclient.FromContext(ctx)
@@ -47,48 +70,25 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 		return ErrBadClient
 	}
 
-	req := t.buildRequest()
+	opts := &client.HTTPOptions{
+		Method: t.Config.Method,
+		URL:    t.Config.URL,
+		//TODO only if set?
+		FollowRedirects: t.Config.FollowRedirects,
+		Headers:         t.Config.Headers,
+		Params:          t.Config.Params,
+		Cookies:         t.Config.Cookies,
+		Body:            t.Config.Body,
+	}
 
-	c.Options.FollowRedirects = t.Config.FollowRedirects
-	c.Options.Proxy = t.Config.Proxy
-
-	err = c.Do(req)
+	err = c.Do(opts)
 
 	return err
 }
 
-//Build HTTP request based on config
-func (t *Task) buildRequest() (req *fasthttp.Request) {
-	req = fasthttp.AcquireRequest()
-	req.Header.SetMethodBytes(t.Config.Method)
-	req.SetRequestURI(t.Config.URL.String())
-
-	for k, v := range t.Config.Headers {
-		req.Header.Set(k, v)
-	}
-
-	for k, v := range t.Config.Cookies {
-		req.Header.SetCookie(k, v)
-	}
-
-	if len(t.Config.Params) == 0 && len(t.Config.Body) > 0 {
-		req.SetBody(t.Config.Body)
-	} else if len(t.Config.Params) > 0 {
-		args := fasthttp.AcquireArgs()
-		for k, v := range t.Config.Params {
-			args.Set(k, v)
-		}
-		req.Header.SetContentType("application/x-www-form-urlencoded")
-		args.WriteTo(req.BodyWriter())
-		fasthttp.ReleaseArgs(args)
-	}
-
-	return req
-}
-
 func (t *Task) String() string {
 	if len(t.Config.Method) == 0 || t.Config.URL == nil {
-		return "http - <nil>"
+		return "http: <nil>"
 	}
-	return t.buildRequest().String()
+	return fmt.Sprintf("http: %s %s", strings.ToUpper(string(t.Config.Method)), t.Config.URL)
 }

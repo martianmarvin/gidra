@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/valyala/fasthttp"
+	"github.com/martianmarvin/gidra/client/httpclient"
 )
 
 // Finds extension from MIME type. Returns empty string if none found.
@@ -118,7 +118,7 @@ func ReadLines(path string) ([]string, error) {
 			return nil, err
 		}
 	} else {
-		_, body, err := fasthttp.Get(nil, path)
+		body, err := httpclient.Get(path)
 		if err != nil {
 			return nil, err
 		}

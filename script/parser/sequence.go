@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/script/options"
@@ -112,9 +111,7 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 		}
 
 		tsk := task.New(taskName)
-		spew.Dump(tsk)
 		seq.Add(tsk, taskConds, taskcfg.Get(taskName, nil))
-		spew.Dump(seq)
 	}
 	return seq, nil
 }
