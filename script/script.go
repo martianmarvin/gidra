@@ -89,10 +89,25 @@ func (s *Script) Load(cfg *config.Config) error {
 	// Buffer queue for concurrency
 	s.queue = make(chan *sequence.Sequence, s.Options.Threads)
 
-	// If no inputs, create NopReader
+	// If no inputs, create NopReader with the same number of rows as
+	// iterations in the loop
 	if len(s.Options.Input) == 0 {
 		s.Options.Input = make(map[string]datasource.ReadableTable)
 		s.Options.Input["main"] = datasource.NewNopReader(s.Options.Loop)
+	}
+
+	// If no outputs, create new writer writing to os.Stdout
+	if s.Options.Output == nil {
+		// If set to quiet, output to NopWriter
+		if s.Options.Verbosity == 0 {
+			s.Options.Output = &datasource.NopWriter{}
+		} else {
+			w, err := datasource.NewWriter("tsv")
+			if err != nil {
+				return err
+			}
+			s.Options.Output = datasource.NewWriteCloser(w, os.Stdout)
+		}
 	}
 
 	if seq := s.Options.BeforeSequence; seq != nil {

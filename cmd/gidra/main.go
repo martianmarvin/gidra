@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/martianmarvin/gidra/datasource"
 	_ "github.com/martianmarvin/gidra/datasource/all"
 	_ "github.com/martianmarvin/gidra/task/all"
 
@@ -35,19 +34,8 @@ func cmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	s.Options.Threads = cfgThreads
-
-	if s.Options.Output == nil {
-		// If no output specified, output tsv to Stdout
-		if cfgQuiet {
-			s.Options.Output = &datasource.NopWriter{}
-		} else {
-			w, err := datasource.NewWriter("tsv")
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			s.Options.Output = datasource.NewWriteCloser(w, os.Stdout)
-		}
+	if cfgQuiet {
+		s.Options.Verbosity = 0
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
