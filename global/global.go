@@ -32,8 +32,11 @@ type Global struct {
 	// Page is the page requested by the last request
 	Page *client.Page
 
+	// Loop is the number of the current iteration of the task loop
+	Loop int
+
 	// Status of the last executed task
-	Status int
+	Status Status
 
 	// Inputs are the user-defined datasources
 	Inputs map[string]datasource.ReadableTable
@@ -81,6 +84,14 @@ func FromContext(ctx context.Context) *Global {
 		page, err := client.Page()
 		if err == nil {
 			g.Page = page
+		}
+	}
+
+	// Use first input to set loop
+	if len(g.Inputs) > 0 {
+		for _, input := range g.Inputs {
+			g.Loop = int(input.Index())
+			break
 		}
 	}
 

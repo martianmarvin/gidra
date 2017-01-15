@@ -31,16 +31,6 @@ var (
 	DefaultRetryLimit = 5
 )
 
-// Status Codes
-type Status int
-
-const (
-	StatusSuccess Status = iota
-	StatusFail
-	StatusAbort
-	StatusSkip
-)
-
 // Flags determining when condition should be checked
 const (
 	// Condition runs before task execution

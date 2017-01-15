@@ -7,6 +7,7 @@ import (
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
+	"github.com/martianmarvin/gidra/global"
 	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/task"
 )
@@ -93,6 +94,8 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 	// Apply vars for this task to the task's context
 	ctx = config.ToContext(ctx, s.Configs[n])
 
+	g := global.FromContext(ctx)
+
 	// Step through pre Conditions to determine whether this
 	// task should be executed
 	for _, cond := range s.Conditions[n] {
@@ -102,6 +105,7 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 			// Condition passed, advance to the next tone
 			continue
 		case condition.ErrSkip:
+			g.Status = global.StatusSkip
 			return err
 		}
 	}
@@ -117,8 +121,10 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 		err = cond.Check(ctx)
 		switch err {
 		case nil:
+			g.Status = global.StatusSuccess
 			return nil
 		case condition.ErrAbort, condition.ErrFail:
+			g.Status = global.StatusFail
 			return err
 		case condition.ErrRetry:
 			// Retry task until condition tells us not to
