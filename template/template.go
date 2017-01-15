@@ -102,7 +102,7 @@ func (t *Template) Execute(data interface{}) (string, error) {
 // config with their executed strings
 func ExecuteConfig(cfg *config.Config, data interface{}) (*config.Config, error) {
 	// Iterate settings and replace templates with executed template result
-	for k, _ := range cfg.Map() {
+	for _, k := range cfg.AllKeys() {
 		if v, err := cfg.GetStringE(k); err == nil {
 			text, err := eval(v, data)
 			if err != nil {
