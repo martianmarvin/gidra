@@ -101,18 +101,7 @@ func (p *Page) Parse(resp *fasthttp.Response) error {
 	})
 
 	// Body
-	var body []byte
-	if p.Headers["Content-Encoding"] == "gzip" {
-		body, err = resp.BodyGunzip()
-		if err != nil {
-			return err
-		}
-	} else {
-		body = resp.Body()
-	}
-	if len(body) == 0 {
-		return nil
-	}
+	body := resp.Body()
 	p.Body = string(body)
 
 	r := bytes.NewReader(body)

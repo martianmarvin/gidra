@@ -247,6 +247,15 @@ func (c *Client) Do(opts interface{}) error {
 	if err != nil {
 		c.responses = append(c.responses, nil)
 	} else {
+		// Unzip if needed
+		if bytes.Equal(resp.Header.Peek("Content-Encoding"), []byte("gzip")) {
+			unzipped, err := resp.BodyGunzip()
+			if err != nil {
+				c.responses = append(c.responses, nil)
+				return err
+			}
+			resp.SetBody(unzipped)
+		}
 		c.responses = append(c.responses, resp)
 		c.page = client.NewPage()
 		c.page.URL, _ = url.Parse(requrl)
