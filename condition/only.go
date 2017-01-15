@@ -2,7 +2,8 @@ package condition
 
 import (
 	"context"
-	"text/template"
+
+	"github.com/martianmarvin/gidra/template"
 )
 
 // Only is the opposite of Skip. The task is executed if it is met, and
@@ -15,9 +16,10 @@ type Only struct {
 }
 
 func NewOnly() Condition {
+	tmpl, _ := template.New("")
 	return &Only{
 		condition: &condition{
-			tmpl: template.New("").Option("missingkey=zero"),
+			tmpl: tmpl,
 			err:  ErrSkip,
 			flag: Before,
 		},

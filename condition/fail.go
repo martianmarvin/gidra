@@ -2,7 +2,8 @@ package condition
 
 import (
 	"context"
-	"text/template"
+
+	"github.com/martianmarvin/gidra/template"
 )
 
 // Fail is like Abort, except it returns ErrFail instead of
@@ -17,9 +18,10 @@ type Fail struct {
 }
 
 func NewFail(callbacks ...CallBackFunc) Condition {
+	tmpl, _ := template.New("")
 	return &Fail{
 		condition: &condition{
-			tmpl: template.New("").Option("missingkey=zero"),
+			tmpl: tmpl,
 			err:  ErrFail,
 			flag: After,
 		},

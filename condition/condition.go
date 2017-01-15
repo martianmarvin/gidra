@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"text/template"
 
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/global"
-	gtemplate "github.com/martianmarvin/gidra/template"
+	"github.com/martianmarvin/gidra/template"
 )
 
 var (
@@ -105,7 +104,8 @@ type condition struct {
 
 // New returns a new empty condition
 func New() Condition {
-	return &condition{tmpl: template.New("")}
+	tmpl, _ := template.New("")
+	return &condition{tmpl: tmpl}
 }
 
 func (c *condition) Parse(cond string) error {
@@ -120,7 +120,7 @@ func (c *condition) Parse(cond string) error {
 	cond = fmt.Sprintf("{{ if %s }} true {{end}}", cond)
 
 	// Create new clone template
-	tmpl, err := gtemplate.New(cond)
+	tmpl, err := template.New(cond)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (c *condition) isMet(data interface{}) bool {
 	if len(c.cond) == 0 {
 		return true
 	}
-	res, err := gtemplate.Execute(c.tmpl, data)
+	res, err := c.tmpl.Execute(data)
 	if err != nil {
 		panic(fmt.Sprintf("Condition '%s' died with error %s", c.cond, err.Error()))
 	}

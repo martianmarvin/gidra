@@ -2,7 +2,8 @@ package condition
 
 import (
 	"context"
-	"text/template"
+
+	"github.com/martianmarvin/gidra/template"
 )
 
 // Skip returns nil(so execution of the task continues) if it is not
@@ -15,9 +16,10 @@ type Skip struct {
 }
 
 func NewSkip() Condition {
+	tmpl, _ := template.New("")
 	return &Skip{
 		condition: &condition{
-			tmpl: template.New("").Option("missingkey=zero"),
+			tmpl: tmpl,
 			err:  ErrSkip,
 			flag: Before,
 		},

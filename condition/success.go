@@ -1,6 +1,6 @@
 package condition
 
-import "text/template"
+import "github.com/martianmarvin/gidra/template"
 
 // Success returns nil if it is met, and an error otherwise
 // MET - nil
@@ -10,9 +10,10 @@ type Success struct {
 }
 
 func NewSuccess() Condition {
+	tmpl, _ := template.New("")
 	return &Success{
 		condition: &condition{
-			tmpl: template.New("").Option("missingkey=zero"),
+			tmpl: tmpl,
 			err:  ErrFail,
 			flag: After,
 		},

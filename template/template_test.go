@@ -25,7 +25,7 @@ func testTmpl(t *testing.T, rawtmpl string) string {
 	g.Vars = testVars
 	tmpl, err := New(rawtmpl)
 	require.NoError(t, err, rawtmpl)
-	text, err := Execute(tmpl, g)
+	text, err := tmpl.Execute(g)
 	assert.NoError(t, err, rawtmpl)
 	return text
 }

@@ -2,7 +2,8 @@ package condition
 
 import (
 	"context"
-	"text/template"
+
+	"github.com/martianmarvin/gidra/template"
 )
 
 // Retry keeps track of retries and attempts the task again as long as
@@ -26,12 +27,13 @@ type Retry struct {
 }
 
 func NewRetry(limit int, callbacks ...CallBackFunc) Condition {
+	tmpl, _ := template.New("")
 	if limit <= 0 {
 		limit = DefaultRetryLimit
 	}
 	return &Retry{
 		condition: &condition{
-			tmpl: template.New("").Option("missingkey=zero"),
+			tmpl: tmpl,
 			err:  ErrRetry,
 			flag: After,
 		},

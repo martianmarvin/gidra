@@ -4,4 +4,4 @@ tasks:
   - sleep:
       duration: 2s
   - print:
-      text: Hello, World!
+      text: '{{ .Vars }}'

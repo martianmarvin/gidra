@@ -2,7 +2,8 @@ package condition
 
 import (
 	"context"
-	"text/template"
+
+	"github.com/martianmarvin/gidra/template"
 )
 
 // Abort returns ErrAbort if it is met, optionally executing a series of
@@ -19,9 +20,10 @@ type Abort struct {
 }
 
 func NewAbort(callbacks ...CallBackFunc) Condition {
+	tmpl, _ := template.New("")
 	return &Abort{
 		condition: &condition{
-			tmpl: template.New("").Option("missingkey=zero"),
+			tmpl: tmpl,
 			err:  ErrAbort,
 			flag: After,
 		},

@@ -14,13 +14,17 @@ var (
 	singleVarRegex  = regexp.MustCompile(`\$(\w+)`)
 )
 
+// FormatFunc transforms a text template before it is compiled
+type FormatFunc func(string) string
+
 // Sets of formatter functions
 var (
 	FmtAll []FormatFunc = []FormatFunc{formatTemplate, formatUserVar}
 )
 
-// FormatFunc transforms a text template before it is compiled
-type FormatFunc func(string) string
+type Template struct {
+	template *template.Template
+}
 
 func formatTemplate(tmpl string) string {
 	if validTmpl(tmpl) {
@@ -70,13 +74,14 @@ func Format(tmpl string, formatters []FormatFunc) string {
 // New creates a new template from the given data and global
 // functions, and returns the result as a compiled template
 // TODO mutex and cache compiled templates?
-func New(tmpl string) (*template.Template, error) {
-	return template.New("").Option("missingkey=zero").Funcs(funcMap).Parse(tmpl)
+func New(tmpl string) (*Template, error) {
+	t, err := template.New("").Option("missingkey=zero").Funcs(funcMap).Parse(tmpl)
+	return &Template{template: t}, err
 }
 
-func execute(t *template.Template, data interface{}) (string, error) {
+func (t *Template) execute(data interface{}) (string, error) {
 	var b bytes.Buffer
-	err := t.Execute(&b, data)
+	err := t.template.Execute(&b, data)
 	if err != nil {
 		return "", err
 	}
@@ -84,22 +89,22 @@ func execute(t *template.Template, data interface{}) (string, error) {
 }
 
 // Execute executes the provided template and returns the result
-func Execute(t *template.Template, data interface{}) (string, error) {
+func (t *Template) Execute(data interface{}) (string, error) {
 	tdata, err := evalVals(data)
 	if err != nil {
 		return "", err
 	}
-	return execute(t, tdata)
+	return t.execute(tdata)
 }
 
 // Execute a string template
 func eval(v string, data interface{}) (string, error) {
 	if validTmpl(v) {
-		tmpl, err := New(v)
+		t, err := New(v)
 		if err != nil {
 			return "", err
 		}
-		return execute(tmpl, data)
+		return t.execute(data)
 	} else {
 		return v, nil
 	}
