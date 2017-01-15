@@ -30,7 +30,7 @@ var (
 	//I/O
 	cfgInputs    = "inputs"
 	cfgOutput    = "output"
-	cfgIOSource  = "source"
+	cfgIOSource  = "path"
 	cfgIOAdapter = "type"
 	cfgIOVars    = "as"
 )

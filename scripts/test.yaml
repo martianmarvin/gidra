@@ -1,7 +1,7 @@
 config:
-  loop: 5
+  loop: 2
 tasks:
   - sleep:
-      duration: 30s
-  - sleep:
       duration: 2s
+  - print:
+      text: Hello, World!

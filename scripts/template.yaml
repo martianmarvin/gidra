@@ -16,21 +16,21 @@ default:
       accept-encoding: gzip, deflate
     proxy:
       type: socks5
-      source: ./test/proxies.txt
+      path: ./test/proxies.txt
 
 vars:
   host: https://www.example.com
 
 inputs:
-  - source: ./test/in.csv
+  - path: ./test/in.csv
     type: csv
-  - source: ./test/users.txt
+  - path: ./test/users.txt
     type: txt
     as: users
 
 output:
   adapter: csv
-  source: ./test/testout.csv
+  path: ./test/testout.csv
 
 before:
   - get:
