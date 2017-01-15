@@ -6,6 +6,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/global"
 )
 
@@ -95,6 +96,22 @@ func (t *Template) Execute(data interface{}) (string, error) {
 		return "", err
 	}
 	return t.execute(tdata)
+}
+
+// ExecuteConfig recursively replaces any templated values in tbe
+// config with their executed strings
+func ExecuteConfig(cfg *config.Config, data interface{}) (*config.Config, error) {
+	// Iterate settings and replace templates with executed template result
+	for k, _ := range cfg.Map() {
+		if v, err := cfg.GetStringE(k); err == nil {
+			text, err := eval(v, data)
+			if err != nil {
+				return cfg, err
+			}
+			cfg.Set(k, text)
+		}
+	}
+	return cfg, nil
 }
 
 // Execute a string template

@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/global"
 	"github.com/martianmarvin/gidra/log"
+	"github.com/martianmarvin/gidra/template"
 )
 
 var (
@@ -88,13 +90,22 @@ func (t *task) show(ctx context.Context) string {
 }
 
 func (t *task) configure(ctx context.Context) error {
+	var err error
 	if l, ok := t.task.(Loggable); ok {
 		l.SetLogger(t.logger)
 	}
 
 	// Populate task's config
 	if c, ok := t.task.(Configurable); ok {
-		err := c.Configure(config.FromContext(ctx))
+		cfg := config.FromContext(ctx).Copy()
+		g := global.FromContext(ctx).Copy()
+		// Execute templated fields in config
+		cfg, err = template.ExecuteConfig(cfg, g)
+		if err != nil {
+			return err
+		}
+
+		err = c.Configure(cfg)
 		if err != nil {
 			return err
 		}

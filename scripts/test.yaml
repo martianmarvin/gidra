@@ -1,7 +1,10 @@
 config:
   loop: 2
+vars:
+  k1: v1
+  k2: v2
 tasks:
   - sleep:
       duration: 2s
   - print:
-      text: '{{ .Vars }}'
+      text: '{{ .Vars.k1 }}'

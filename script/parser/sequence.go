@@ -178,7 +178,7 @@ func parseCallbacks(key string, cfg *config.Config) []condition.CallBackFunc {
 			return err
 		}
 		cvars := vars.FromContext(ctx)
-		_, err = template.Execute(tmpl, cvars)
+		_, err = tmpl.Execute(cvars)
 		return err
 	}
 

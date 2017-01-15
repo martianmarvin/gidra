@@ -487,6 +487,15 @@ func (cfg *Config) Map() map[string]interface{} {
 	return cfg.AllSettings()
 }
 
+// Copy creates a shallow copy of this config struct
+func (cfg *Config) Copy() *Config {
+	newcfg := New()
+	for k, v := range cfg.AllSettings() {
+		newcfg.Set(k, v)
+	}
+	return newcfg
+}
+
 // StringMap returns the config as a map with string values
 func (cfg *Config) StringMap() map[string]string {
 	m := make(map[string]string)
