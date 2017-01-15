@@ -2,6 +2,7 @@ package httpclient
 
 // Config values
 var (
+	cfgDefault         = "default.http"
 	cfgURL             = "url"
 	cfgFollowRedirects = "follow_redirects"
 	cfgTimeout         = "timeout"

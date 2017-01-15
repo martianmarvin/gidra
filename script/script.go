@@ -77,12 +77,9 @@ func (s *Script) Load(cfg *config.Config) error {
 	var err error
 
 	// Parse yaml script and merge with default config
-	c, err := config.Default.Extend(cfg)
-	if err != nil {
-		return err
-	}
+	cfg = config.Default.Extend(cfg)
 
-	err = parser.Configure(s.Options, c)
+	err = parser.Configure(s.Options, cfg)
 	if err != nil {
 		return err
 	}

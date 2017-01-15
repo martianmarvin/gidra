@@ -88,6 +88,11 @@ func New() *Client {
 // Configure applies relevant options from the given config to this client
 // TODO Check for errors on each config option
 func (c *Client) Configure(cfg *config.Config) error {
+	var err error
+	// Apply global defaults from config
+	// TODO: How to deal with user override of global defaults? Just YAML
+	// parser?
+	cfg = config.Default.Get(cfgDefault, nil).Extend(cfg)
 	opts := &Options{
 		URL:             cfg.GetURL(cfgURL),
 		FollowRedirects: cfg.GetBool(cfgFollowRedirects),
@@ -99,7 +104,7 @@ func (c *Client) Configure(cfg *config.Config) error {
 		Body:            []byte(cfg.GetString(cfgBody)),
 		Simulate:        cfg.GetBool(cfgSimulate),
 	}
-	err := mergo.MergeWithOverwrite(c.Options, opts)
+	err = mergo.MergeWithOverwrite(c.Options, opts)
 	if err != nil {
 		return err
 	}

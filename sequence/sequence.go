@@ -164,11 +164,13 @@ func (s *Sequence) Execute(ctx context.Context) *Result {
 	return res
 }
 
+// TODO make sure user variables are shown
 // String implements the Stringer interface
 func (s *Sequence) String() string {
 	var out string
-	// for n, tsk := range s.Tasks {
-	// 	out += task.Show(s.stepCtx(n), tsk) + "\n"
-	// }
+	for i := 0; i < s.Size(); i++ {
+		ctx := config.ToContext(context.Background(), s.Configs[i])
+		out += fmt.Sprintf("%d: %s\n", i, task.Show(ctx, s.Tasks[i]))
+	}
 	return out
 }

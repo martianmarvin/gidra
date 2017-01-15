@@ -46,7 +46,7 @@ func TestParse(t *testing.T) {
 	cfg, err := ParseYaml(f)
 	require.NoError(err)
 
-	cfg, err = cfg.Extend(Default)
+	cfg = Default.Extend(cfg)
 	require.NoError(err)
 
 	assert.Equal("1", cfg.GetString("version"))
@@ -75,10 +75,35 @@ func TestError(t *testing.T) {
 	cfg, err := ParseYaml(f)
 	require.NoError(err)
 
-	cfg, err = cfg.Extend(Default)
+	cfg = cfg.Extend(Default)
 	require.NoError(err)
 
 	line, n := cfg.findLine("config.task_timeout")
 	assert.Equal(5, n)
 	assert.Contains(line, "task_timeout")
+}
+
+func TestMerge(t *testing.T) {
+	assert := assert.New(t)
+	m1 := map[string]interface{}{"k1": "v1", "k2": "v2",
+		"km1": map[string]interface{}{
+			"k1": "v1",
+			"k2": "v2",
+		}}
+	m2 := map[string]interface{}{"k1": "v1a", "k3": "v3",
+		"km1": map[string]interface{}{
+			"k1": "v1a",
+			"k3": "v3a",
+		}}
+	merged := mergeMaps(m1, m2)
+	assert.NotEmpty(merged)
+	assert.Equal(merged["k1"], "v1a")
+	assert.Equal(merged["k3"], "v3")
+	sm := merged["km1"].(map[string]interface{})
+	assert.Equal(sm["k1"], "v1a")
+	assert.Equal(sm["k2"], "v2")
+	assert.Equal(sm["k3"], "v3a")
+	cfg := FromMap(merged)
+	assert.Equal(len(merged), len(cfg.AllSettings()))
+	assert.Contains(cfg.AllKeys(), "km1.k1")
 }

@@ -56,8 +56,8 @@ func TestSimulate(t *testing.T) {
 	resp, err := client.Page()
 	assert.NoError(err)
 	assert.NotNil(resp)
-	body := resp.Body
 
-	assert.Contains(body, "/get")
-	assert.Contains(body, "v1")
+	assert.Contains(resp.Body, "/get")
+	assert.Contains(resp.Body, "v1")
+	assert.Contains(resp.Body, "Accept-Encoding")
 }

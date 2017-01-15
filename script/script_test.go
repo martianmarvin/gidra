@@ -20,10 +20,11 @@ tasks:
       duration: 2s
 `,
 	`
-http:
-  headers:
-    user-agent: gidra-test
-    h1: v1
+default:
+  http:
+    headers:
+      user-agent: gidra-test
+      h1: v1
 vars:
   host: https://www.example.com
 before:
@@ -45,7 +46,7 @@ func TestLoad(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	for i, scr := range testScripts {
+	for i, scr := range testScripts[1:] {
 		msg := fmt.Sprintf("test script #%d \n%20s", i, scr)
 		var buf bytes.Buffer
 
@@ -56,5 +57,6 @@ func TestLoad(t *testing.T) {
 		s.DryRun(&buf)
 		output := string(buf.Bytes())
 		assert.NotEmpty(output, msg)
+		t.Log(output)
 	}
 }

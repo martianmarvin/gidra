@@ -54,20 +54,51 @@ type Config struct {
 
 // New initializes a new Config
 func New() *Config {
-	return &Config{
+	cfg := &Config{
 		Viper: viper.New(),
 	}
+	cfg.Viper.SetConfigType("yaml")
+	return cfg
 }
 
-// Extend merges the new config with this one
-func (cfg *Config) Extend(newcfg *Config) (*Config, error) {
-	c := newcfg.String()
-	if len(c) == 0 {
-		return cfg, ErrParse
+// Extend merges the new config with this one and returns the merged config
+func (cfg *Config) Extend(newcfg *Config) *Config {
+	merged := New()
+	for k, v := range cfg.AllSettings() {
+		merged.Set(k, v)
 	}
-
-	err := cfg.Viper.MergeConfig(strings.NewReader(c))
-	return cfg, err
+	for k, v := range newcfg.AllSettings() {
+		switch v.(type) {
+		case map[string]interface{}:
+			v1, err := cfg.GetMapE(k)
+			v2 := newcfg.GetMap(k)
+			// Old value is not a map, overwrite
+			if err != nil {
+				merged.Set(k, v)
+			} else {
+				merged.Set(k, mergeMaps(v1, v2))
+			}
+		case map[string]string:
+			v2 := newcfg.GetStringMap(k)
+			for sk, sv := range v2 {
+				key := fmt.Sprintf("%s.%s", k, sk)
+				merged.Set(key, sv)
+			}
+		case []interface{}, []string:
+			v1, err := cfg.GetSliceE(k)
+			v2 := newcfg.GetSlice(k)
+			// Old value is not a map, overwrite
+			if err != nil {
+				merged.Set(k, v)
+			} else {
+				merged.Set(k, append(v1, v2))
+			}
+		default:
+			merged.Set(k, v)
+		}
+	}
+	merged.text = cfg.text
+	return merged
 }
 
 func (cfg *Config) get(path string) *Config {
@@ -89,14 +120,13 @@ func (cfg *Config) findLine(path string) (string, int) {
 	var line string
 	var n int
 
-	s := cfg.text
 	if len(cfg.text) == 0 {
 		return "", 0
 	}
 	parts := strings.Split(path, ".")
 
 	i := 0
-	scanner := bufio.NewScanner(bytes.NewReader(s))
+	scanner := bufio.NewScanner(bytes.NewReader(cfg.text))
 	for scanner.Scan() {
 		n++
 		re := regexp.MustCompile(parts[i] + `:`)
@@ -423,7 +453,6 @@ func ParseYaml(r io.Reader) (*Config, error) {
 	}
 	b = bytes.Replace(b, []byte("\t"), []byte("  "), -1)
 	cfg := New()
-	cfg.Viper.SetConfigType("yaml")
 	cfg.text = b
 	err = cfg.Viper.ReadConfig(bytes.NewReader(b))
 	return cfg, err
@@ -465,6 +494,33 @@ func (cfg *Config) StringMap() map[string]string {
 		m[k] = fmt.Sprint(v)
 	}
 	return m
+}
+
+// FromMap creates a new Config from a map
+func FromMap(m map[string]interface{}) *Config {
+	cfg := New()
+	for k, v := range m {
+		cfg.Set(k, v)
+	}
+	cfg.text = []byte(cfg.String())
+	return cfg
+}
+
+// Recursively merge new with old
+func mergeMaps(m1, m2 map[string]interface{}) map[string]interface{} {
+	for k, v2 := range m2 {
+		v1 := m1[k]
+		if sm2, ok := v2.(map[string]interface{}); ok {
+			if sm1, ok := v1.(map[string]interface{}); ok {
+				m1[k] = mergeMaps(sm1, sm2)
+			} else {
+				m1[k] = v2
+			}
+		} else {
+			m1[k] = v2
+		}
+	}
+	return m1
 }
 
 // String implements the Stringer interface
