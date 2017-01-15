@@ -78,14 +78,15 @@ func (s *Sequence) Size() int {
 }
 
 // Executes the specified single step/task in the sequence
-func (s *Sequence) executeStep(ctx context.Context, n int) error {
+func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 	var err, taskErr error
 	var ok bool
+	res := &Result{}
 
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok = r.(error); !ok {
-				err = fmt.Errorf("sequence [%d]: %v", n, r)
+				res.Err = fmt.Errorf("sequence [%d]: %v", n, r)
 			}
 		}
 	}()
@@ -106,13 +107,15 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 			continue
 		case condition.ErrSkip:
 			g.Status = global.StatusSkip
-			return err
+			res.Err = err
+			return res
 		}
 	}
 
 	taskErr = tsk.Execute(ctx)
 	if taskErr != nil {
-		return taskErr
+		res.Err = taskErr
+		return res
 	}
 
 	// Step through post conditions to evaluate if the task executed
@@ -122,52 +125,46 @@ func (s *Sequence) executeStep(ctx context.Context, n int) error {
 		switch err {
 		case nil:
 			g.Status = global.StatusSuccess
-			return nil
+			return res
 		case condition.ErrAbort, condition.ErrFail:
 			g.Status = global.StatusFail
-			return err
+			res.Err = err
+			return res
 		case condition.ErrRetry:
 			// Retry task until condition tells us not to
 			for err == condition.ErrRetry {
 				taskErr = tsk.Execute(ctx)
 				if taskErr != nil {
-					return taskErr
+					res.Err = taskErr
+					return res
 				}
 				err = cond.Check(ctx)
 			}
 		}
 	}
 
-	return taskErr
+	return res
 }
 
 //Execute executes all remaining incomplete tasks in the Sequence
-func (s *Sequence) Execute(ctx context.Context) *Result {
-	res := NewResult()
-	done := make(chan error, 1)
-	for n, _ := range s.Tasks {
-		// set number of current step
-		s.n = n
-		Logger.WithField("sid", s.Id).WithField("n", n).Warn("Executing step")
-		go func() {
-			done <- s.executeStep(ctx, s.n)
-		}()
-		select {
-		case err := <-done:
-			//TODO Instrument logging here
-			if err == condition.ErrAbort {
-				panic("Aborting script!")
-			} else if err == condition.ErrFail {
-				return res
-			} else if err != nil {
-				res.Errors = append(res.Errors, err)
+func (s *Sequence) Execute(ctx context.Context) <-chan *Result {
+	results := make(chan *Result, 1)
+	go func() {
+		defer close(results)
+		for n, _ := range s.Tasks {
+			logger := Logger.WithField("sid", s.Id).WithField("n", n)
+			s.n = n
+			logger.Warn("Executing step")
+			// Wait for step to complete or cancellation
+			select {
+			case results <- s.executeStep(ctx, s.n):
+				logger.Warn("Sent Result")
+			case <-ctx.Done():
+				return
 			}
-		case <-ctx.Done():
-			return res
 		}
-	}
-	// res.ReadContext(s.ctx) TODO get result
-	return res
+	}()
+	return results
 }
 
 // TODO make sure user variables are shown

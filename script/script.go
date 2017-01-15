@@ -195,33 +195,37 @@ func (s *Script) Show(w io.Writer) {
 // Goroutine worker that runs sequences and returns results
 func (s *Script) worker(ctx context.Context) {
 	defer s.wg.Done()
+	defer Logger.Warn("worker shutting down...")
 	for seq := range s.queue {
 		seqTimeout := s.Options.TaskTimeout * time.Duration(seq.Size())
 		ctx, cancel := context.WithTimeout(ctx, seqTimeout)
-		select {
-		case s.results <- seq.Execute(ctx):
-			Logger.Warn("Sent Result")
-			cancel()
-		case <-ctx.Done():
-			return
+		defer cancel()
+
+		// Channel of results from this particular sequence, in order of
+		// steps
+		results := seq.Execute(ctx)
+		for res := range results {
+			select {
+			case s.results <- res:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}
-	Logger.Warn("worker shutting down...")
 }
 
 // Goroutine that receives results and processes them with OutputFunc
 func (s *Script) resultProcessor(ctx context.Context, filters ...datasource.FilterFunc) {
 	output := s.Options.Output
-	defer Logger.Warn("processor shutting down...")
 	for {
 		select {
 		case res := <-s.results:
 			Logger.Warn(res)
-			if err := res.Err(); err != nil {
+			if err := res.Err; err != nil {
 				Logger.Error(err)
 				continue
 			}
-			if res.Output.Len() > 0 {
+			if res.Output != nil && res.Output.Len() > 0 {
 				output.Append(res.Output)
 				output.WriteTo(nil)
 			}

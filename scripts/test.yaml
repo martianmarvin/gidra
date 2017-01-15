@@ -1,5 +1,5 @@
 config:
-  loop: 1
+  loop: 5
 vars:
   k1: v1
   k2: v2
@@ -9,4 +9,4 @@ tasks:
       headers:
         k1: '{{ .Vars.k1 }}'
   - print:
-      text: '{{ $.Page }}'
+      text: '{{ $.Page.Body }}'
