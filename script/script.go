@@ -18,6 +18,7 @@ import (
 	"github.com/martianmarvin/gidra/script/options"
 	"github.com/martianmarvin/gidra/script/parser"
 	"github.com/martianmarvin/gidra/sequence"
+	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/vars"
 )
 
@@ -128,7 +129,13 @@ func (s *Script) Load(cfg *config.Config) error {
 			return err
 		}
 		seq := s.Options.MainSequence.Copy()
-		seq.Row = row
+
+		// Provide tasks with input if they expect it
+		for _, tsk := range seq.Tasks {
+			if readerTask, ok := tsk.(task.Readable); ok {
+				readerTask.SetRow(row)
+			}
+		}
 
 		s.Add(seq)
 	}
@@ -235,13 +242,14 @@ func (s *Script) resultProcessor(ctx context.Context, filters ...datasource.Filt
 	for {
 		select {
 		case res := <-s.results:
-			Logger.Warn(res)
 			if err := res.Err; err != nil {
 				Logger.Error(err)
 				continue
 			}
 			if res.Output != nil && res.Output.Len() > 0 {
-				output.Append(res.Output)
+				if err := output.Append(res.Output); err != nil {
+					Logger.Error(err)
+				}
 				output.WriteTo(nil)
 			}
 		case <-ctx.Done():

@@ -1,12 +1,9 @@
 config:
-  loop: 5
+  loop: 1
 vars:
   k1: v1
   k2: v2
 tasks:
-  - get:
-      url: http://httpbin.org/get
-      headers:
-        k1: '{{ .Vars.k1 }}'
-  - print:
-      text: '{{ $.Page.Body }}'
+  - extract:
+      regex: '#(.+?)#'
+      text: '#target#\nn#wizard#\n\n#shamus#'

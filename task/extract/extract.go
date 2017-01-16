@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -21,12 +22,13 @@ var (
 )
 
 func init() {
-	task.Register("extract", NewTask)
+	task.Register("extract", New)
 }
 
 type Task struct {
 	task.Worker
 	task.Configurable
+	task.Writeable
 
 	Config *Config
 }
@@ -48,10 +50,11 @@ type Config struct {
 	TrimSpace bool `task:"trim"`
 }
 
-func NewTask() task.Task {
+func New() task.Task {
 	t := &Task{
-		Config: &Config{TrimSpace: true},
-		Worker: task.NewWorker(),
+		Config:    &Config{TrimSpace: true},
+		Worker:    task.NewWorker(),
+		Writeable: task.NewWriteable(),
 	}
 	t.Configurable = task.NewConfigurable(t.Config)
 	return t
@@ -78,7 +81,6 @@ func elementMatcher(pattern string) (matcher cascadia.Selector, err error) {
 }
 
 //Functions to extract fields from results
-//TODO Ability to extract a list of values instead of a single one
 
 func matchByRegex(matcher *regexp.Regexp, text []byte) bool {
 	return matcher.Match(text)
@@ -87,12 +89,14 @@ func matchByRegex(matcher *regexp.Regexp, text []byte) bool {
 //ExtractByRegex extracts the specified value from the page via a regex
 func extractByRegex(matcher *regexp.Regexp, text []byte) []string {
 	var results []string
-	matches := matcher.FindSubmatch(text)
-	if len(matches) < 2 {
-		return results
-	}
-	for _, result := range matches[1:] {
-		results = append(results, string(result))
+	allMatches := matcher.FindAllSubmatch(text, -1)
+	for _, matches := range allMatches {
+		if len(matches) < 2 {
+			continue
+		}
+		for _, result := range matches[1:] {
+			results = append(results, string(result))
+		}
 	}
 	return results
 }
@@ -126,7 +130,8 @@ func extractByElement(matcher cascadia.Selector, text []byte) []string {
 }
 
 // Execute extracts specified text
-func (t *Task) Execute(ctx context.Context) (err error) {
+func (t *Task) Execute(ctx context.Context) error {
+	var err error
 	var results []string
 	var rk string
 	var text []byte
@@ -189,6 +194,12 @@ func (t *Task) Execute(ctx context.Context) (err error) {
 		extracted = append(extracted, res)
 	}
 	taskVars.SetPath(rk, extracted)
+
+	// Write to output
+	for i, v := range extracted {
+		k := fmt.Sprintf("%s.%d", rk, i)
+		t.Row().AppendKV(k, v)
+	}
 
 	return err
 }

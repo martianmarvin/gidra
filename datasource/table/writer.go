@@ -56,13 +56,20 @@ func (w *Writer) SetColumns(cols []string) error {
 }
 
 func (w *Writer) Append(row *datasource.Row) error {
-	var err error
+	// Pad with extra columns from row if needed
+	start := w.dataset.Width()
+	newcols := row.Columns()[start:]
+	cols := append(w.dataset.Headers(), newcols...)
+	err := w.SetColumns(cols)
+	if err != nil {
+		return err
+	}
+
 	var vals []interface{}
 	for _, val := range row.Values() {
 		vals = append(vals, val.Interface())
 	}
-	w.dataset.Append(vals)
-	return err
+	return w.dataset.Append(vals)
 }
 
 func (w *Writer) WriteTo(writer io.Writer) (n int64, err error) {

@@ -104,6 +104,7 @@ func (row *Row) Len() int {
 	return len(row.data.MustMap())
 }
 
+// TODO Use string values instead of interface{}
 // Append adds values to the row. It returns the new row, so it can be chained
 func (row *Row) Append(vals ...interface{}) *Row {
 	hwidth := len(row.headers)

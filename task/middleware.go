@@ -60,9 +60,23 @@ func (t *task) Execute(ctx context.Context) error {
 	// Execute task supporting cancellation via context
 	done := make(chan error)
 	go func() {
+		g := global.FromContext(ctx)
+
 		t.logger.Info("Starting...")
 
+		// Load input row if the task accepts it
+		if r, ok := t.task.(Readable); ok {
+			r.SetRow(g.Data)
+		}
+
 		done <- t.task.Execute(ctx)
+
+		// Save result if the task offers it
+		if w, ok := t.task.(Writeable); ok {
+			if res := w.Row(); res != nil {
+				g.Result = res
+			}
+		}
 
 		t.logger.Info("Done")
 	}()

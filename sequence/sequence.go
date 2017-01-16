@@ -6,7 +6,6 @@ import (
 
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
-	"github.com/martianmarvin/gidra/datasource"
 	"github.com/martianmarvin/gidra/global"
 	"github.com/martianmarvin/gidra/log"
 	"github.com/martianmarvin/gidra/task"
@@ -18,9 +17,6 @@ var Logger = log.Logger()
 type Sequence struct {
 	// The number of the current loop iteration
 	Id int
-
-	// The current row of data from the main input
-	Row *datasource.Row
 
 	//Tasks is the list of tasks in this sequence
 	Tasks []task.Task
@@ -80,16 +76,15 @@ func (s *Sequence) Size() int {
 // Executes the specified single step/task in the sequence
 func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 	var err, taskErr error
-	var ok bool
 	res := &Result{}
 
-	defer func() {
-		if r := recover(); r != nil {
-			if err, ok = r.(error); !ok {
-				res.Err = fmt.Errorf("sequence [%d]: %v", n, r)
-			}
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		if err, ok := r.(error); !ok {
+	// 			res.Err = fmt.Errorf("sequence [%d]: %v", n, r)
+	// 		}
+	// 	}
+	// }()
 
 	tsk := s.Tasks[n]
 	// Apply vars for this task to the task's context
@@ -117,6 +112,9 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 		res.Err = taskErr
 		return res
 	}
+
+	// Capture this task's output if the task provides it
+	res.Output = g.Result
 
 	// Step through post conditions to evaluate if the task executed
 	// successfully

@@ -40,6 +40,12 @@ type Global struct {
 
 	// Inputs are the user-defined datasources
 	Inputs map[string]datasource.ReadableTable
+
+	// Data represents the current row of data from the main input as a map
+	Data *datasource.Row
+
+	// Result is the resulting output returned by the task, if any
+	Result *datasource.Row
 }
 
 // New instantiates a new Global object
@@ -47,6 +53,8 @@ func New() *Global {
 	return &Global{
 		Vars:   make(map[string]interface{}),
 		Inputs: make(map[string]datasource.ReadableTable),
+		Data:   datasource.NewRow(),
+		Result: datasource.NewRow(),
 		Page:   client.NewPage(),
 	}
 }
@@ -54,16 +62,7 @@ func New() *Global {
 // Copy returns a shallow copy of the Global
 func (g *Global) Copy() *Global {
 	g2 := New()
-	for k, v := range g.Vars {
-		g2.Vars[k] = v
-	}
-	for k, v := range g.Inputs {
-		g2.Inputs[k] = v
-	}
-	if g.Proxy != nil {
-		*g2.Proxy = *g.Proxy
-	}
-	*g2.Page = *g.Page
+	*g2 = *g
 	return g2
 }
 
