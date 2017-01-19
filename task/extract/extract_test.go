@@ -15,7 +15,7 @@ import (
 var testText = `
 <div>
   <div class="t2">
-    <p class="t3">
+    <p class="t3" id="contentTag">
 	  content
 	</p>
   </div>
@@ -52,10 +52,15 @@ as: result
 as: result
 trim: false
 `,
+		`element: '.t2>.t3' 
+as: result
+attr: id
+`,
 	}
 	expected := []string{
 		"content",
 		"\n\t  content\n\t",
+		"contentTag",
 	}
 
 	for i, testCfg := range testCfgs {
@@ -65,12 +70,12 @@ trim: false
 
 func TestExtractRegex(t *testing.T) {
 	testCfgs := []string{
-		`regex: '(?s)t3">(.*?)<' 
+		`regex: '(?s)t3" id="(.*?)"' 
 as: result
 `,
 	}
 	expected := []string{
-		"content",
+		"contentTag",
 	}
 
 	for i, testCfg := range testCfgs {

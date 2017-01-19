@@ -1,9 +1,10 @@
 config:
   loop: 1
-vars:
-  k1: v1
-  k2: v2
 tasks:
+  - get:
+      url: http://demo.imacros.net/Automate/Extract2
   - extract:
-      regex: '#(.+?)#'
-      text: '#target#\nn#wizard#\n\n#shamus#'
+      element: td.bdytxt>a
+      attr: href
+  - print:
+      text: '{{ .Result }}'

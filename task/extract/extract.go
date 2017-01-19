@@ -40,6 +40,12 @@ type Config struct {
 	//Jquery selector to match to extract
 	ElementSelector string `task:"element"`
 
+	//Attribute to extract value of, if any
+	Attr string
+
+	// Whether to extract the full HTML of an element rather than the text
+	Html bool
+
 	//Key to save match in, if any
 	Key string `task:"as"`
 
@@ -120,12 +126,25 @@ func matchByElement(matcher cascadia.Selector, text []byte) bool {
 	}
 }
 
-//ExtractByElement extracts the specified value from the page via a
+//extractByElement extracts the specified value from the page via a
 //goquery selector
-func extractByElement(matcher cascadia.Selector, text []byte) []string {
+func extractByElement(matcher cascadia.Selector, text []byte, html bool) []string {
 	els := findByElement(matcher, text)
 	return els.Map(func(n int, el *goquery.Selection) string {
-		return el.Text()
+		if html {
+			res, _ := el.Html()
+			return res
+		} else {
+			return el.Text()
+		}
+	})
+}
+
+// Extracts attribute values of selected elements
+func extractAttrsByElement(matcher cascadia.Selector, text []byte, attr string) []string {
+	els := findByElement(matcher, text)
+	return els.Map(func(n int, el *goquery.Selection) string {
+		return el.AttrOr(attr, "")
 	})
 }
 
@@ -174,7 +193,11 @@ func (t *Task) Execute(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		results = extractByElement(matcher, text)
+		if len(t.Config.Attr) > 0 {
+			results = extractAttrsByElement(matcher, text, t.Config.Attr)
+		} else {
+			results = extractByElement(matcher, text, t.Config.Html)
+		}
 	} else if len(t.Config.RegexSelector) > 0 {
 		matcher, err := regexMatcher(t.Config.RegexSelector)
 		if err != nil {
