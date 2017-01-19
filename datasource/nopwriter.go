@@ -21,3 +21,7 @@ func (w *NopWriter) Append(row *Row) error {
 func (w *NopWriter) Close() error {
 	return nil
 }
+
+func (w *NopWriter) Filter(fn FilterFunc) error {
+	return nil
+}

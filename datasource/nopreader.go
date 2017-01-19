@@ -40,6 +40,17 @@ func (r *NopReader) Next() (*Row, error) {
 	}
 }
 
+func (r *NopReader) Value() *Row {
+	if r.Index() == 0 {
+		return nil
+	} else {
+		row := NewRow()
+		row.Index = r.Index()
+		return row
+	}
+
+}
+
 func (r *NopReader) Index() int64 {
 	return atomic.LoadInt64(&r.index)
 }
@@ -48,5 +59,9 @@ func (r *NopReader) Len() int64 {
 }
 
 func (r *NopReader) Close() error {
+	return nil
+}
+
+func (r *NopReader) Filter(fn FilterFunc) error {
 	return nil
 }

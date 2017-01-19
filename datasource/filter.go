@@ -9,6 +9,9 @@ type FilterFunc func(row *Row) *Row
 // string value
 func StringEqualsFilter(key, val string) FilterFunc {
 	return FilterFunc(func(row *Row) *Row {
+		if row == nil {
+			return nil
+		}
 		field, err := row.Get(key).String()
 		if err != nil {
 			return nil
@@ -17,5 +20,19 @@ func StringEqualsFilter(key, val string) FilterFunc {
 			return nil
 		}
 		return row
+	})
+}
+
+// PrependFilter prepends the given text to the specified key
+func PrependFilter(key, val string) FilterFunc {
+	return FilterFunc(func(row *Row) *Row {
+		if row == nil {
+			return nil
+		}
+		oldval, err := row.Get(key).String()
+		if err != nil {
+			return nil
+		}
+		return row.Set(key, val+oldval)
 	})
 }

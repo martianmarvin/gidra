@@ -145,11 +145,17 @@ func (row *Row) AppendMap(m map[string]interface{}) *Row {
 // the row's headers
 func (row *Row) SetMap(m map[string]interface{}) *Row {
 	for key, val := range m {
-		if row.ColumnIndex(key) >= 0 {
-			row.data.Set(key, val)
-		} else {
-			row.AppendKV(key, val)
-		}
+		row.Set(key, val)
+	}
+	return row
+}
+
+// Set sets a single value
+func (row *Row) Set(key string, val interface{}) *Row {
+	if row.ColumnIndex(key) >= 0 {
+		row.data.Set(key, val)
+	} else {
+		row.AppendKV(key, val)
 	}
 	return row
 }
