@@ -31,6 +31,7 @@ var (
 	cfgInputs    = "inputs"
 	cfgOutput    = "output"
 	cfgIOSource  = "path"
+	cfgIOList    = "list"
 	cfgIOAdapter = "type"
 	cfgIOVars    = "as"
 )
@@ -40,4 +41,5 @@ var cfgAliases = map[string]string{
 	"repeat":  cfgConfigLoop,
 	"workers": cfgConfigThreads,
 	"if":      cfgTaskCond,
+	"do":      cfgTaskBefore,
 }
