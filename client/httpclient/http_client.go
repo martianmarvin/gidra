@@ -156,7 +156,6 @@ func (c *Client) buildRequest(opts *client.HTTPOptions) *fasthttp.Request {
 		for k, v := range opts.Params {
 			args.Set(k, v)
 		}
-		req.Header.SetContentType("application/x-www-form-urlencoded")
 		args.WriteTo(req.BodyWriter())
 		fasthttp.ReleaseArgs(args)
 	}

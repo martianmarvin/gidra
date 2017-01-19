@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -44,8 +45,7 @@ type Config struct {
 	Body []byte
 
 	// JSON body
-	// TODO - marshal and save bytes in Body
-	Json map[string]string
+	Json map[string]interface{}
 }
 
 func newHTTP() *Task {
@@ -68,6 +68,23 @@ func (t *Task) Execute(ctx context.Context) error {
 	c, ok := httpclient.FromContext(ctx)
 	if !ok {
 		return ErrBadClient
+	}
+
+	if len(t.Config.Json) > 0 {
+		data, err := json.Marshal(t.Config.Json)
+		if err != nil {
+			return err
+		}
+		t.Config.Body = data
+	}
+
+	//override content-type if not set
+	if _, ok := t.Config.Headers["Content-Type"]; !ok {
+		if len(t.Config.Params) > 0 {
+			t.Config.Headers["Content-Type"] = "application/x-www-form-urlencoded"
+		} else if len(t.Config.Json) > 0 {
+			t.Config.Headers["Content-Type"] = "application/json"
+		}
 	}
 
 	opts := &client.HTTPOptions{

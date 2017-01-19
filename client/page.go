@@ -16,6 +16,9 @@ var (
 	ErrEmpty = errors.New("Body is empty")
 )
 
+// Normalizer for keys
+var keyNormalizer = strings.NewReplacer("-", "_", ".", "_", " ", "_")
+
 // Page represents a single http response with easier accessors that
 // *fasthttp.Response
 type Page struct {
@@ -85,6 +88,7 @@ func (p *Page) Parse(resp *fasthttp.Response) error {
 			i += 1
 		}
 		p.Headers[key] = val
+		p.Headers[normalizeKey(key)] = val
 	})
 
 	// Cookies
@@ -151,16 +155,43 @@ func (p *Page) String() string {
 	return string(p.Bytes)
 }
 
-// Json returns the page body in JSON format
-func (p *Page) Json() (*simplejson.Json, error) {
+// json returns the page body in JSON format
+func (p *Page) jsonBody() (*simplejson.Json, error) {
 	if p.json != nil {
 		return p.json, nil
 	}
-	json, err := simplejson.NewJson(p.Bytes)
+	r := strings.NewReader(p.Body)
+	json, err := simplejson.NewFromReader(r)
 	if err != nil {
 		return nil, err
 	}
 	p.json = json
 	return p.json, nil
+}
 
+// JSON returns the page's valid JSON content as a map
+// TODO normalize nested keys - for now use template index function
+func (p *Page) Json() (map[string]interface{}, error) {
+	j, err := p.jsonBody()
+	if err != nil {
+		return nil, err
+	}
+	data, err := j.Map()
+	if err != nil {
+		return nil, err
+	}
+	// add normalized versions of keys for easy template access
+	for k, v := range data {
+		nk := normalizeKey(k)
+		// Normalize if this would not overwrite another key
+		if _, ok := data[nk]; !ok {
+			data[nk] = v
+		}
+	}
+	return data, nil
+
+}
+
+func normalizeKey(k string) string {
+	return strings.ToLower(keyNormalizer.Replace(k))
 }
