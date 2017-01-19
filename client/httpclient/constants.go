@@ -6,7 +6,6 @@ var (
 	cfgURL             = "url"
 	cfgFollowRedirects = "follow_redirects"
 	cfgTimeout         = "timeout"
-	cfgProxy           = "proxy"
 	cfgHeaders         = "headers"
 	cfgParams          = "params"
 	cfgCookies         = "cookies"

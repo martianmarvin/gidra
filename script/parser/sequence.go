@@ -147,7 +147,7 @@ func parseCondition(key string, cfg *config.Config) (condition.Condition, error)
 	}
 
 	// Condition can be a string or submap
-	tmpl, err := cfg.GetStringE(ck)
+	tmpl, err := cfg.GetStringE(key)
 	if err == nil {
 		err = cond.Parse(tmpl)
 		return cond, err

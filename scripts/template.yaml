@@ -14,9 +14,6 @@ default:
       accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
       accept-language: en-US,en;q=0.5
       accept-encoding: gzip, deflate
-    proxy:
-      type: socks5
-      path: ./test/proxies.txt
 
 vars:
   host: https://www.example.com
@@ -29,8 +26,12 @@ inputs:
     as: users
 
 output:
-  adapter: csv
+  type: csv
   path: ./test/testout.csv
+
+proxy:
+  type: socks5
+  path: ./test/proxies.txt
 
 before:
   - get:
@@ -43,8 +44,7 @@ tasks:
   - get:
       <<: *http
       url: '{{ .Vars.host }}'
-      success:
-        when: '{{ eq .Page.Status 200 }}'
+      success: '{{ eq .Page.Status 200 }}'
   - extract:
       regex: 'csrf_token="(.*)"'
       as: csrf_token

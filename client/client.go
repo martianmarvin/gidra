@@ -44,7 +44,8 @@ type Client interface {
 type Options struct {
 	Timeout time.Duration
 
-	Proxy *url.URL
+	// Function that returns a valid proxy or nil
+	Proxy func() *url.URL
 
 	// Print requests instead of executing them
 	Simulate bool

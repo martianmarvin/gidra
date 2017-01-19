@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -237,7 +238,7 @@ func (s *Script) worker(ctx context.Context) {
 }
 
 // Goroutine that receives results and processes them with OutputFunc
-func (s *Script) resultProcessor(ctx context.Context, filters ...datasource.FilterFunc) {
+func (s *Script) resultProcessor(ctx context.Context) {
 	output := s.Options.Output
 	for {
 		select {
@@ -269,8 +270,29 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	//TODO cleaner config
 	client := httpclient.New()
 	client.Configure(config.New())
+
+	// set proxy iterator on client
+	client.Options.Proxy = func() *url.URL {
+		var err error
+		if opts.Proxies == nil {
+			return nil
+		}
+		//Advance to first proxy if needed
+		val := opts.Proxies.Value()
+		if val == nil {
+			val, err = opts.Proxies.Next()
+			if err != nil {
+				return nil
+			}
+		}
+		u, err := url.Parse(val.GetIndex(0).MustString())
+		if err != nil {
+			return nil
+		}
+		return u
+	}
+
 	ctx = httpclient.ToContext(ctx, client)
-	// Configure global client options
 
 	// Variables
 	scriptVars := vars.New()
