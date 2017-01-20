@@ -1,8 +1,7 @@
 package parser
 
 import (
-	"os"
-	"path"
+	"strings"
 	"testing"
 
 	// Register datasource and task types
@@ -12,7 +11,7 @@ import (
 
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/script/options"
-	"github.com/martianmarvin/gidra/sequence"
+	"github.com/martianmarvin/gidra/template"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,56 +19,34 @@ import (
 // The test script has all possible options
 var testScript = "./scripts/template.yaml"
 
-func TestParser(t *testing.T) {
+// For transition to table driven tests
+type parserTest struct {
+	rawcfg string
+	// template for getting the result from opts, ex '{{ $.Timeout }}'
+	valTmpl  string
+	expected string
+}
+
+// Generic tester for parser
+func testParser(t *testing.T, parser ParseFunc, v parserTest) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	// Change to base dir for tests
-	baseDir := path.Join(os.Getenv("GOPATH"), "src/github.com/martianmarvin/gidra/")
-	os.Chdir(baseDir)
+	r := strings.NewReader(v.rawcfg)
+	cfg, err := config.ParseYaml(r)
+	require.NoError(err)
 
-	f, err := os.Open(testScript)
-	require.NoError(err)
-	cfg, err := config.ParseYaml(f)
-	require.NoError(err)
 	opts := options.New()
+	err = parser(opts, cfg)
+	require.NoError(err)
 
-	err = Configure(opts, cfg)
+	tmpl, err := template.New(v.valTmpl)
+	require.NoError(err)
+
+	res, err := tmpl.Execute(opts)
 	assert.NoError(err)
 
-	// Config
-	subcfg, ok := cfg.CheckGet(cfgConfig)
-	require.True(ok)
-	// Not equal because loop should be limited by test file size
-	assert.NotEqual(opts.Input["main"].Len(), subcfg.GetInt(cfgConfigLoop), "config.loop")
-	assert.Equal(opts.Threads, subcfg.GetInt(cfgConfigThreads), "config.threads")
-	assert.Equal(opts.TaskTimeout, subcfg.GetDuration(cfgConfigTaskTimeout), "config.task_timeout")
-	assert.Equal(opts.Verbosity, subcfg.GetInt(cfgConfigVerbosity), "config.verbosity")
+	res = strings.TrimSpace(res)
 
-	// Global Vars
-	gvars, err := cfg.GetStringMapE(cfgVars)
-	assert.NoError(err, "vars")
-	assert.Equal(len(gvars), len(opts.Vars.Map()))
-
-	//Sequence Templates
-	subcfgs := make([][]*config.Config, 3)
-	subcfgs[0] = cfg.GetConfigSlice(cfgSeqBefore)
-	subcfgs[1] = cfg.GetConfigSlice(cfgSeqTasks)
-	subcfgs[2] = cfg.GetConfigSlice(cfgSeqAfter)
-
-	sequences := make([]*sequence.Sequence, 3)
-	sequences[0] = opts.BeforeSequence
-	sequences[1] = opts.MainSequence
-	sequences[2] = opts.AfterSequence
-
-	for i, seq := range sequences {
-		require.NotNil(seq)
-		n := len(subcfgs[i])
-		assert.Len(seq.Tasks, n)
-	}
-
-	// Update tests below if template.yaml changes
-	assert.Equal("http://icanhazip.com", opts.BeforeSequence.Configs[0].GetString("url"))
-	assert.Equal("http://www.example.com", opts.MainSequence.Configs[2].GetString("headers.referer"))
-
+	assert.Equal(v.expected, res)
 }

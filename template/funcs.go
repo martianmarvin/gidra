@@ -53,6 +53,8 @@ func initFuncMap() {
 		"match": matchRegex,
 		// Get the output of running a shell command
 		"shell": runShell,
+		// Suppress output of a command/ like piping to /dev/null
+		"null": null,
 	}
 
 }
@@ -94,4 +96,8 @@ func runShell(args ...string) (string, error) {
 		return "", err
 	}
 	return string(out), nil
+}
+
+func null(args ...interface{}) string {
+	return ""
 }

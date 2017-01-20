@@ -32,9 +32,8 @@ func proxyParser(s *options.ScriptOptions, cfg *config.Config) error {
 	// Append default scheme to all rows
 	// TODO other columns to mark proxy good/bad, speed, etc
 	err = reader.Filter(func(r *datasource.Row) *datasource.Row {
-		r.SetColumns([]string{"rawurl"})
 		rawurl := r.GetIndex(0).MustString()
-		r.Set("rawurl", appendScheme(rawurl, scheme))
+		r.Set("url", appendScheme(rawurl, scheme))
 		return r
 	})
 
@@ -56,9 +55,6 @@ func parseProxy(cfg *config.Config) (datasource.ReadableTable, error) {
 	// Read slice into reader
 	rawurls, err := cfg.GetStringSliceE(cfgProxy)
 	if err == nil {
-		for i, rawurl := range rawurls {
-			rawurls[i] = appendScheme(rawurl, defaultProxyScheme)
-		}
 		return stringReader(strings.Join(rawurls, "\n"))
 	}
 
@@ -70,6 +66,8 @@ func parseProxy(cfg *config.Config) (datasource.ReadableTable, error) {
 // Reader from single string
 func stringReader(s string) (datasource.ReadableTable, error) {
 	reader, _ := datasource.NewReader("csv")
+	// Add header
+	s = "url\n" + s
 	r := strings.NewReader(s)
 	_, err := reader.ReadFrom(r)
 	if err != nil {
