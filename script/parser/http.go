@@ -1,22 +1,96 @@
 package parser
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/datasource"
+	"github.com/martianmarvin/gidra/script/options"
 )
 
-// TODO: Transparently replace a file path with a slice of results in all
-// tasks, this should be unused for now
+func init() {
+	Register(cfgProxy, proxyParser)
+}
+
+func proxyParser(s *options.ScriptOptions, cfg *config.Config) error {
+	var err error
+	var reader datasource.ReadableTable
+
+	scheme := cfg.GetString(cfgIOAdapter)
+	if len(scheme) == 0 {
+		scheme = defaultProxyScheme
+	}
+
+	reader, err = parseProxy(cfg)
+	if err != nil {
+		return err
+	}
+
+	// Append default scheme to all rows
+	// TODO other columns to mark proxy good/bad, speed, etc
+	err = reader.Filter(func(r *datasource.Row) *datasource.Row {
+		rawurl := r.GetIndex(0).MustString()
+		r.Set("url", appendScheme(rawurl, scheme))
+		return r
+	})
+
+	if err != nil {
+		return err
+	}
+
+	s.Proxies = reader
+	return nil
+}
+
+func parseProxy(cfg *config.Config) (datasource.ReadableTable, error) {
+	// If proxy is a single url, create reader for it
+	rawurl, err := cfg.GetStringE(cfgProxy)
+	if err == nil {
+		return stringReader(rawurl)
+	}
+
+	// Read slice into reader
+	rawurls, err := cfg.GetStringSliceE(cfgProxy)
+	if err == nil {
+		return stringReader(strings.Join(rawurls, "\n"))
+	}
+
+	// Read from input file
+	subcfg := cfg.Get(cfgProxy, nil)
+	return parseInput(subcfg)
+}
+
+// Reader from single string
+func stringReader(s string) (datasource.ReadableTable, error) {
+	reader, _ := datasource.NewReader("csv")
+	// Add header
+	s = "url\n" + s
+	r := strings.NewReader(s)
+	_, err := reader.ReadFrom(r)
+	if err != nil {
+		return nil, err
+	}
+	return reader, nil
+}
+
+// Append scheme if it is not present
+func appendScheme(rawurl, scheme string) string {
+	if strings.Contains(rawurl, "://") {
+		return rawurl
+	}
+	return fmt.Sprintf("%s://%s", strings.ToLower(scheme), rawurl)
+}
+
+// Parse list into a iterable table
 // URLs could be map, list, filename to read from, or url string
 func parseURLList(key string, cfg *config.Config) (*client.URLList, error) {
 	var err error
 	l := client.NewURLList()
 
-	// URL string
+	// single URL string
 	u, err := cfg.GetURLE(key)
 	if err == nil {
 		l.Append(u)
@@ -24,15 +98,20 @@ func parseURLList(key string, cfg *config.Config) (*client.URLList, error) {
 		return l, err
 	}
 
-	// URL list
-	urls, err := cfg.GetStringSliceE(key)
+	// Otherwise look for a list
+	lk := key + "." + cfgIOList
+
+	// array/list of URLs
+	urls, err := cfg.GetStringSliceE(lk)
 	if err == nil {
 		l.AppendString(urls...)
 		_, err = l.Next()
 		return l, err
 	}
 
-	// Map with scheme and source
+	// String representing an input
+
+	// Map with list and optional scheme
 	m, err := cfg.GetStringMapE(key)
 	if err == nil {
 		source, ok := m[cfgIOSource]

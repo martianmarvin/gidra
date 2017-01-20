@@ -9,6 +9,10 @@ var (
 	cfgConfigVerbosity   = "verbosity"
 	cfgConfigTaskTimeout = "task_timeout"
 
+	// Connection
+	cfgProxy           = "proxy"
+	defaultProxyScheme = "http"
+
 	//Global variablies
 	cfgVars = "vars"
 
@@ -31,8 +35,10 @@ var (
 	cfgInputs    = "inputs"
 	cfgOutput    = "output"
 	cfgIOSource  = "path"
+	cfgIOList    = "list"
 	cfgIOAdapter = "type"
 	cfgIOVars    = "as"
+	cfgMainInput = "main"
 )
 
 // Aliases for config keys
@@ -40,4 +46,6 @@ var cfgAliases = map[string]string{
 	"repeat":  cfgConfigLoop,
 	"workers": cfgConfigThreads,
 	"if":      cfgTaskCond,
+	"do":      cfgTaskBefore,
+	"name":    cfgIOVars,
 }

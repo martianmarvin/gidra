@@ -91,7 +91,7 @@ func fromURL(u *url.URL) (ReadableTable, error) {
 // FromURL returns a reader reading from the specified URL. The address can also
 // be a local file with the file:// scheme
 func FromURL(u *url.URL) (ReadableTable, error) {
-	if u.Scheme == "file" {
+	if u.Scheme == "file" || u.Scheme == "" {
 		fp := u.Host + u.Path
 		return FromFile(fp)
 	} else {

@@ -2,6 +2,7 @@ package table
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"sync/atomic"
 
@@ -23,14 +24,28 @@ type Reader struct {
 
 	// Open loads raw data into a *tablib.Dataset used by this reader
 	Open importFunc
+
+	// Filters to use before returning data
+	filters []datasource.FilterFunc
 }
 
 func NewReader(importer importFunc) *Reader {
 	reader := &Reader{
 		Open:    importer,
 		dataset: &tablib.Dataset{},
+		filters: make([]datasource.FilterFunc, 0),
 	}
 	return reader
+}
+
+func (r *Reader) Filter(fn datasource.FilterFunc) error {
+	for _, ofn := range r.filters {
+		if ofn == nil {
+			return errors.New("Invalid filter")
+		}
+	}
+	r.filters = append(r.filters, fn)
+	return nil
 }
 
 //Reads all data from the underlying reader
@@ -56,7 +71,12 @@ func (r *Reader) buildRow(index int64) (row *datasource.Row, err error) {
 	row.SetColumns(r.dataset.Headers())
 	row.SetMap(datarow)
 
-	return row, err
+	// Apply filters
+	for _, fn := range r.filters {
+		row = fn(row)
+	}
+
+	return row, nil
 
 }
 
@@ -68,6 +88,19 @@ func (r *Reader) Next() (*datasource.Row, error) {
 	} else {
 		atomic.AddInt64(&r.index, 1)
 		return r.buildRow(index)
+	}
+}
+
+func (r *Reader) Value() *datasource.Row {
+	index := r.Index()
+	if index == 0 || index >= r.Len() {
+		return nil
+	} else {
+		row, err := r.buildRow(index)
+		if err != nil {
+			return nil
+		}
+		return row
 	}
 }
 

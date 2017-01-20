@@ -79,6 +79,7 @@ func New() *Client {
 		Options: &client.HTTPOptions{
 			Options: &client.Options{
 				Timeout: defaultTimeout,
+				Proxy:   func() *url.URL { return nil },
 			},
 		},
 	}
@@ -103,7 +104,6 @@ func (c *Client) Configure(cfg *config.Config) error {
 		Body:            []byte(cfg.GetString(cfgBody)),
 		Options: &client.Options{
 			Timeout:  cfg.GetDuration(cfgTimeout),
-			Proxy:    cfg.GetURL(cfgProxy),
 			Simulate: cfg.GetBool(cfgSimulate),
 		},
 	}
@@ -112,14 +112,11 @@ func (c *Client) Configure(cfg *config.Config) error {
 		return err
 	}
 	c.jar.SetMap(".", c.Options.Cookies)
-	if c.Options.Proxy != nil {
-		c.dialer.Proxy = c.Options.Proxy
-	}
 	return nil
 }
 
 func (c *Client) Dial(addr string) (net.Conn, error) {
-	return c.dialer.Dial(addr, c.Options.Proxy)
+	return c.dialer.Dial(addr, c.Options.Proxy())
 }
 
 //Close closes the underlying connection and releases all responses

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -17,11 +18,11 @@ func init() {
 }
 
 func inputParser(s *options.ScriptOptions, cfg *config.Config) error {
-	inputs, err := cfg.GetMapSliceE(cfgInputs)
+	inputs, err := cfg.GetConfigSliceE(cfgInputs)
 	if err != nil {
 		return err
 	}
-	parsed, err := parseInput(inputs)
+	parsed, err := parseInputs(inputs)
 	if err != nil {
 		return err
 	}
@@ -33,68 +34,64 @@ func inputParser(s *options.ScriptOptions, cfg *config.Config) error {
 // Creates an input datasource based on the config
 // If there is no input defined, creates a dummy reader that iterates for the
 // specified number of loop iterations
-func parseInput(inputs []map[string]interface{}) (map[string]datasource.ReadableTable, error) {
+func parseInputs(inputs []*config.Config) (map[string]datasource.ReadableTable, error) {
 	readers := make(map[string]datasource.ReadableTable)
-	var err error
 
-	for _, input := range inputs {
-		source, ok := input[cfgIOSource].(string)
-		if !ok || len(source) == 0 {
-			return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
-		}
-
-		adapter, ok := input[cfgIOAdapter].(string)
-		if ok {
-			adapter = strings.ToLower(adapter)
-		}
-
-		name, ok := input[cfgIOVars].(string)
-		if !ok || len(name) == 0 {
-			// No variable name provided
-			// Main input defaults to first source without an 'as' declaration
-			if readers["main"] == nil {
-				reader, err := datasource.FromFileType(source, adapter)
-				if err != nil {
-					return nil, err
-				}
-				readers["main"] = reader
+	var n int
+	for _, subcfg := range inputs {
+		name := subcfg.GetString(cfgIOVars)
+		if len(name) == 0 {
+			if readers[cfgMainInput] == nil {
+				name = cfgMainInput
 			} else {
-				return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
+				// Inputs without a name address by number
+				name = fmt.Sprint(n)
+				n += 1
 			}
-		} else {
-			reader, err := datasource.FromFileType(source, adapter)
-			if err != nil {
-				return nil, err
-			}
-			readers[name] = reader
 		}
+		input, err := parseInput(subcfg)
+		if err != nil {
+			return readers, err
+		}
+		readers[name] = input
+	}
+	return readers, nil
+}
+
+//Parse a single input
+func parseInput(inputcfg *config.Config) (datasource.ReadableTable, error) {
+	source, err := inputcfg.GetStringE(cfgIOSource)
+	if err != nil {
+		return nil, config.KeyError{Name: cfgIOSource, Err: err}
 	}
 
-	return readers, err
+	adapter := strings.ToLower(inputcfg.GetString(cfgIOAdapter))
+
+	return datasource.FromFileType(source, adapter)
 }
 
 func outputParser(s *options.ScriptOptions, cfg *config.Config) error {
-	outputs, err := cfg.GetMapE(cfgOutput)
-	if err == nil {
-		parsed, err := parseOutput(outputs)
-		if err != nil {
-			return err
-		}
-		s.Output = parsed
+	output := cfg.Get(cfgOutput, nil)
+	if len(output.AllKeys()) == 0 {
+		return nil
 	}
+	parsed, err := parseOutput(output)
+	if err != nil {
+		return err
+	}
+	s.Output = parsed
+
 	return nil
 }
 
-func parseOutput(output map[string]interface{}) (*datasource.WriteCloser, error) {
-	source, ok := output[cfgIOSource].(string)
-	if !ok || len(source) == 0 {
-		return nil, config.KeyError{Name: cfgIOSource, Err: config.ErrRequired}
+func parseOutput(outputcfg *config.Config) (*datasource.WriteCloser, error) {
+	source, err := outputcfg.GetStringE(cfgIOSource)
+	if err != nil {
+		return nil, config.KeyError{Name: cfgIOSource, Err: err}
 	}
 
-	adapter, ok := output[cfgIOAdapter].(string)
-	if ok {
-		adapter = strings.ToLower(adapter)
-	} else {
+	adapter := strings.ToLower(outputcfg.GetString(cfgIOAdapter))
+	if len(adapter) == 0 {
 		// Guess adapter from file exetension
 		adapter = strings.TrimLeft(path.Ext(source), ".")
 	}

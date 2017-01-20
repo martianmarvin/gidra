@@ -30,6 +30,9 @@ type ScriptOptions struct {
 	// Datasources to read from
 	Input map[string]datasource.ReadableTable
 
+	// Proxies to use for requests
+	Proxies datasource.ReadableTable
+
 	// File to write output, or stdout if none
 	Output datasource.WriteableTable
 

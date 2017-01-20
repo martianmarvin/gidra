@@ -1,6 +1,7 @@
 package table
 
 import (
+	"errors"
 	"io"
 
 	tablib "github.com/agrison/go-tablib"
@@ -16,13 +17,27 @@ type Writer struct {
 
 	// Open is the opener that converts a dataset into exportable format
 	Open exportFunc
+
+	// Filters to use before returning data
+	filters []datasource.FilterFunc
 }
 
 func NewWriter(exporter exportFunc) *Writer {
 	return &Writer{
 		Open:    exporter,
 		dataset: tablib.NewDataset(nil),
+		filters: make([]datasource.FilterFunc, 0),
 	}
+}
+
+func (w *Writer) Filter(fn datasource.FilterFunc) error {
+	for _, ofn := range w.filters {
+		if ofn == nil {
+			return errors.New("Invalid filter")
+		}
+	}
+	w.filters = append(w.filters, fn)
+	return nil
 }
 
 // SetColumns sets headers on this table
@@ -63,6 +78,11 @@ func (w *Writer) Append(row *datasource.Row) error {
 	err := w.SetColumns(cols)
 	if err != nil {
 		return err
+	}
+
+	// Apply filters
+	for _, fn := range w.filters {
+		row = fn(row)
 	}
 
 	var vals []interface{}
