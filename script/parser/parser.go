@@ -61,6 +61,11 @@ func Register(key string, fn ParseFunc) {
 func Configure(s *options.ScriptOptions, cfg *config.Config) error {
 	var keys []string
 
+	// Add aliases in case we missed any
+	for k, v := range cfgAliases {
+		cfg.RegisterAlias(k, v)
+	}
+
 	parsed := make(map[string]bool)
 	// Add keys in ParseFirst to the chain before the others
 	for _, key := range ParseFirst {

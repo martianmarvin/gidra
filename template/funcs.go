@@ -1,6 +1,8 @@
 package template
 
 import (
+	"container/list"
+	"container/ring"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -9,6 +11,7 @@ import (
 	"regexp"
 	"text/template"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/martianmarvin/gidra/datasource"
 )
 
@@ -45,8 +48,8 @@ func initFuncMap() {
 		"eq": strEq,
 		// Get environment variable
 		"env": getEnv,
-		// Advance a reader to the next position
-		"next": nextRow,
+		// Advance an iterable to the next position
+		"next": next,
 		// Return a random element of the list
 		"pick": pickRand,
 		// Match a regex
@@ -55,6 +58,10 @@ func initFuncMap() {
 		"shell": runShell,
 		// Suppress output of a command/ like piping to /dev/null
 		"null": null,
+		// Print to Stdout
+		"echo": echo,
+		// For debugging, dump the object
+		"dump": sdump,
 	}
 
 }
@@ -63,9 +70,22 @@ func getEnv(k string) string {
 	return os.Getenv(k)
 }
 
-func nextRow(r datasource.ReadableTable) *datasource.Row {
-	row, _ := r.Next()
-	return row
+func next(iter interface{}) interface{} {
+	switch r := iter.(type) {
+	case datasource.ReadableTable:
+		res, _ := r.Next()
+		return res
+	case ring.Ring:
+		return r.Next().Value
+	case list.List:
+		el := r.Front()
+		if el == nil {
+			return nil
+		}
+		return el.Next().Value
+	default:
+		return nil
+	}
 }
 
 // TODO: Fix InterfaceSlice
@@ -100,4 +120,13 @@ func runShell(args ...string) (string, error) {
 
 func null(args ...interface{}) string {
 	return ""
+}
+
+func echo(args ...interface{}) string {
+	fmt.Println(args)
+	return ""
+}
+
+func sdump(args ...interface{}) string {
+	return spew.Sdump(args)
 }

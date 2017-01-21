@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 
@@ -17,50 +18,75 @@ func init() {
 
 func proxyParser(s *options.ScriptOptions, cfg *config.Config) error {
 	var err error
-	var reader datasource.ReadableTable
 
 	scheme := cfg.GetString(cfgIOAdapter)
 	if len(scheme) == 0 {
 		scheme = defaultProxyScheme
 	}
 
-	reader, err = parseProxy(cfg)
+	proxies, err := parseProxy(cfg)
 	if err != nil {
 		return err
 	}
-
-	// Append default scheme to all rows
-	// TODO other columns to mark proxy good/bad, speed, etc
-	err = reader.Filter(func(r *datasource.Row) *datasource.Row {
-		rawurl := r.GetIndex(0).MustString()
-		r.Set("url", appendScheme(rawurl, scheme))
-		return r
-	})
-
-	if err != nil {
-		return err
+	for _, u := range proxies {
+		if len(u.Scheme) == 0 {
+			u.Scheme = scheme
+		}
 	}
 
-	s.Proxies = reader
+	s.Proxies = proxies
 	return nil
 }
 
-func parseProxy(cfg *config.Config) (datasource.ReadableTable, error) {
+func parseProxy(cfg *config.Config) ([]*url.URL, error) {
+	var proxies []*url.URL
 	// If proxy is a single url, create reader for it
 	rawurl, err := cfg.GetStringE(cfgProxy)
 	if err == nil {
-		return stringReader(rawurl)
+		u, err := url.Parse(rawurl)
+		if err != nil {
+			return proxies, err
+		}
+		proxies = append(proxies, u)
+		return proxies, nil
 	}
 
 	// Read slice into reader
 	rawurls, err := cfg.GetStringSliceE(cfgProxy)
 	if err == nil {
-		return stringReader(strings.Join(rawurls, "\n"))
+		for _, rawurl := range rawurls {
+			u, err := url.Parse(rawurl)
+			if err != nil {
+				return proxies, err
+			}
+			proxies = append(proxies, u)
+		}
+		return proxies, nil
 	}
 
 	// Read from input file
 	subcfg := cfg.Get(cfgProxy, nil)
-	return parseInput(subcfg)
+	reader, err := parseInput(subcfg)
+	if err != nil {
+		return proxies, err
+	}
+	for {
+		row, err := reader.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return proxies, err
+		} else {
+			rawurl := row.GetIndex(0).MustString()
+			u, err := url.Parse(rawurl)
+			if err != nil {
+				return proxies, err
+			}
+			proxies = append(proxies, u)
+		}
+	}
+
+	return proxies, nil
 }
 
 // Reader from single string

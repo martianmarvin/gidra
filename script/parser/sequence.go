@@ -6,11 +6,11 @@ import (
 
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/global"
 	"github.com/martianmarvin/gidra/script/options"
 	"github.com/martianmarvin/gidra/sequence"
 	"github.com/martianmarvin/gidra/task"
 	"github.com/martianmarvin/gidra/template"
-	"github.com/martianmarvin/vars"
 )
 
 func init() {
@@ -88,40 +88,39 @@ func parseSequence(taskList []*config.Config) (*sequence.Sequence, error) {
 			taskName = k
 			break
 		}
-
-		// Get task sub config map
-		tm, err := taskcfg.GetMapE(taskName)
-		if err != nil {
-			return nil, err
-		}
+		taskcfg = taskcfg.Get(taskName, nil)
 
 		// Parse all conditions like 'success', 'fail', etc for this task
-		for k, _ := range tm {
+		for k, _ := range taskcfg.Map() {
+			if !isCondition(k) {
+				continue
+			}
 			cond, err := parseCondition(k, taskcfg)
 			if err != nil {
-				if err, ok := err.(config.KeyError); ok {
-					// config.KeyError simply means this item is not a
-					// condition
-					continue
-				} else {
-					return nil, err
-				}
+				return nil, err
 			}
 			taskConds = append(taskConds, cond)
 		}
 
 		tsk := task.New(taskName)
-		seq.Add(tsk, taskConds, taskcfg.Get(taskName, nil))
+		seq.Add(tsk, taskConds, taskcfg)
 	}
 	return seq, nil
 }
 
+// Whether this key is one of the condition keys (should not be passed on to
+// task
+func isCondition(key string) bool {
+	for _, k := range conditionKeys {
+		if key == k || cfgAliases[key] == k {
+			return true
+		}
+	}
+	return false
+}
+
 func parseCondition(key string, cfg *config.Config) (condition.Condition, error) {
 	var cond condition.Condition
-
-	if k, ok := cfgAliases[key]; ok {
-		key = k
-	}
 
 	callbacks := parseCallbacks(key+"."+cfgTaskBefore, cfg)
 
@@ -142,6 +141,11 @@ func parseCondition(key string, cfg *config.Config) (condition.Condition, error)
 		cond = condition.NewRetry(limit, callbacks...)
 	case cfgTaskFailCond:
 		cond = condition.NewFail(callbacks...)
+	case cfgTaskBefore:
+		// Just run task callbacks
+		callbacks = parseCallbacks(key, cfg)
+		cond = condition.NewTrue(callbacks...)
+		return cond, nil
 	default:
 		return nil, config.KeyError{Name: key}
 	}
@@ -181,8 +185,8 @@ func parseCallbacks(key string, cfg *config.Config) []condition.CallBackFunc {
 		if err != nil {
 			return err
 		}
-		cvars := vars.FromContext(ctx)
-		_, err = tmpl.Execute(cvars)
+		g := global.FromContext(ctx)
+		_, err = tmpl.Execute(g)
 		return err
 	}
 

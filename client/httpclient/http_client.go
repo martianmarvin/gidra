@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/imdario/mergo"
-	"github.com/martianmarvin/conn"
+	"github.com/martianmarvin/botlib/conn"
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/client/mock"
 	"github.com/martianmarvin/gidra/config"
@@ -83,7 +83,7 @@ func New() *Client {
 			},
 		},
 	}
-	c.client.Dial = c.dialer.FastDial
+	c.client.Dial = c.Dial
 	return c
 }
 

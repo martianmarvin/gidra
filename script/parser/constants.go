@@ -31,6 +31,10 @@ var (
 	cfgTaskRetryCond   = "retry"
 	cfgTaskFailCond    = "fail"
 
+	// All condition keys
+	conditionKeys = []string{cfgTaskCond, cfgTaskBefore, cfgTaskSuccessCond,
+		cfgTaskSkipCond, cfgTaskAbortCond, cfgTaskRetryCond, cfgTaskFailCond}
+
 	//I/O
 	cfgInputs    = "inputs"
 	cfgOutput    = "output"

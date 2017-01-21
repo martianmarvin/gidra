@@ -4,6 +4,7 @@
 package options
 
 import (
+	"net/url"
 	"time"
 
 	"github.com/martianmarvin/gidra/datasource"
@@ -31,7 +32,7 @@ type ScriptOptions struct {
 	Input map[string]datasource.ReadableTable
 
 	// Proxies to use for requests
-	Proxies datasource.ReadableTable
+	Proxies []*url.URL
 
 	// File to write output, or stdout if none
 	Output datasource.WriteableTable
@@ -49,7 +50,8 @@ type ScriptOptions struct {
 // New initializes an empty set of options
 func New() *ScriptOptions {
 	return &ScriptOptions{
-		Vars:  vars.New(),
-		Input: make(map[string]datasource.ReadableTable),
+		Vars:    vars.New(),
+		Input:   make(map[string]datasource.ReadableTable),
+		Proxies: make([]*url.URL, 0),
 	}
 }

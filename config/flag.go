@@ -10,6 +10,16 @@ const (
 	FieldRequired
 
 	FieldOmitEmpty
+
+	// Flags determining when condition should be checked
+	// Condition runs before task execution
+	CondBefore
+
+	// Condition runs after task execution
+	CondAfter
+
+	// Condition only runs once during the entire sequence
+	CondOnce
 )
 
 func (f *Flag) IsSet(flag Flag) bool {

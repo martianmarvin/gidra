@@ -4,7 +4,6 @@ package global
 
 import (
 	"context"
-	"net/url"
 
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/client/httpclient"
@@ -27,7 +26,7 @@ type Global struct {
 	Vars map[string]interface{}
 
 	// Proxy represents the proxy list used by the task
-	Proxy *url.URL
+	Proxy *List
 
 	// Page is the page requested by the last request
 	Page *client.Page

@@ -265,6 +265,10 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	log.SetLevel(opts.Verbosity)
 	ctx = log.ToContext(ctx, log.Logger())
 
+	// Template Globals
+	g := configureGlobal(global.New(), opts)
+	ctx = global.ToContext(ctx, g)
+
 	// HTTP Client, using an empty config for now as client already applies
 	// defaults
 	//TODO cleaner config
@@ -273,23 +277,12 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 
 	// set proxy iterator on client
 	client.Options.Proxy = func() *url.URL {
-		var err error
-		if opts.Proxies == nil {
+		if u, ok := g.Proxy.Value().(*url.URL); ok {
+			return u
+		} else {
 			return nil
 		}
-		//Advance to first proxy if needed
-		val := opts.Proxies.Value()
-		if val == nil {
-			val, err = opts.Proxies.Next()
-			if err != nil {
-				return nil
-			}
-		}
-		u, err := url.Parse(val.GetIndex(0).MustString())
-		if err != nil {
-			return nil
-		}
-		return u
+
 	}
 
 	ctx = httpclient.ToContext(ctx, client)
@@ -315,10 +308,6 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 
 	ctx = vars.ToContext(ctx, scriptVars)
 
-	// Template Globals
-	g := configureGlobal(global.New(), opts)
-	ctx = global.ToContext(ctx, g)
-
 	return ctx
 }
 
@@ -335,6 +324,12 @@ func configureGlobal(g *global.Global, opts *options.ScriptOptions) *global.Glob
 	if len(opts.Input) > 0 {
 		g.Inputs = opts.Input
 	}
+
+	var vals []interface{}
+	for _, u := range opts.Proxies {
+		vals = append(vals, u)
+	}
+	g.Proxy = global.NewList(vals)
 
 	return g
 }
