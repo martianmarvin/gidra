@@ -278,13 +278,20 @@ func configureContext(ctx context.Context, opts *options.ScriptOptions) context.
 	client.Configure(config.New())
 
 	// set proxy iterator on client
+	//NOTE Proxy will only change on the next subsequent connection
 	client.Options.Proxy = func() *url.URL {
 		if u, ok := g.Proxy.Value().(*url.URL); ok {
+			log.Logger().WithField("proxy", u).Warn("Using proxy")
 			return u
-		} else {
-			return nil
 		}
-
+		if rawu, ok := g.Proxy.Value().(string); ok {
+			u, err := url.Parse(rawu)
+			if err != nil {
+				return nil
+			}
+			return u
+		}
+		return nil
 	}
 
 	ctx = httpclient.ToContext(ctx, client)
