@@ -3,6 +3,7 @@ package global
 import (
 	"container/ring"
 	"fmt"
+	"math/rand"
 )
 
 // Lists are simple lists of values that are easy for a user to manipulate from
@@ -38,6 +39,15 @@ func (l *List) Next() interface{} {
 	return l.r.Value
 }
 
+// Rand advances to a random value
+func (l *List) Rand() interface{} {
+	if l.Len() == 0 {
+		return nil
+	}
+	l.r = l.r.Move(rand.Intn(l.Len()))
+	return l.r.Value
+}
+
 // Returns the current value in the list
 func (l *List) Value() interface{} {
 	return l.r.Value
@@ -58,11 +68,18 @@ func (l *List) Values() []interface{} {
 
 // Removes the top value from the list
 func (l *List) Pop() interface{} {
-	if l.r.Len() == 0 {
+	if l.Len() == 0 {
 		return nil
 	}
 	l.r = l.r.Prev()
 	return l.r.Unlink(1).Value
+}
+
+// Sets the current top value
+func (l *List) Set(v interface{}) {
+	if l.Len() > 0 {
+		l.r.Value = v
+	}
 }
 
 // String returns the CURRENT value of the list as a string
