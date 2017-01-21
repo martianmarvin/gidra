@@ -221,19 +221,25 @@ func (s *Script) worker(ctx context.Context) {
 	defer Logger.Warn("worker shutting down...")
 	for seq := range s.queue {
 		seqTimeout := s.Options.TaskTimeout * time.Duration(seq.Size())
-		ctx, cancel := context.WithTimeout(ctx, seqTimeout)
-		defer cancel()
+		seqctx, cancel := context.WithTimeout(ctx, seqTimeout)
 
 		// Channel of results from this particular sequence, in order of
 		// steps
-		results := seq.Execute(ctx)
+		results := seq.Execute(seqctx)
 		for res := range results {
+			if res.Err != nil {
+				Logger.Error(res.Err)
+				// Halt sequence on error for now
+				break
+			}
 			select {
 			case s.results <- res:
 			case <-ctx.Done():
+				cancel()
 				return
 			}
 		}
+		cancel()
 	}
 }
 
@@ -243,10 +249,6 @@ func (s *Script) resultProcessor(ctx context.Context) {
 	for {
 		select {
 		case res := <-s.results:
-			if err := res.Err; err != nil {
-				Logger.Error(err)
-				continue
-			}
 			if res.Output != nil && res.Output.Len() > 0 {
 				if err := output.Append(res.Output); err != nil {
 					Logger.Error(err)

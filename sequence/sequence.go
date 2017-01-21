@@ -3,6 +3,7 @@ package sequence
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/martianmarvin/gidra/condition"
 	"github.com/martianmarvin/gidra/config"
@@ -124,6 +125,7 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 
 	// Step through post conditions to evaluate if the task executed
 	// successfully
+	//TODO verify retry triggers correctly
 	for _, cond := range s.Conditions[n] {
 		if !cond.Flags().IsSet(config.CondAfter) {
 			continue
@@ -137,6 +139,7 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 				return res
 			}
 		case condition.ErrAbort, condition.ErrFail:
+			//TODO preserve original taskErr
 			g.Status = global.StatusFail
 			if taskErr == nil {
 				res.Err = err
@@ -159,11 +162,14 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 }
 
 //Execute executes all remaining incomplete tasks in the Sequence
+//TODO refactor into a worker the receives tasks and returns results
 func (s *Sequence) Execute(ctx context.Context) <-chan *Result {
 	results := make(chan *Result, 1)
 	go func() {
 		defer close(results)
 		for n, _ := range s.Tasks {
+			// Hack for now to synchronize
+			time.Sleep(1 * time.Millisecond)
 			logger := Logger.WithField("sid", s.Id).WithField("n", n)
 			s.n = n
 			logger.Warn("Executing step")
