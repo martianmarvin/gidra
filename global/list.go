@@ -76,10 +76,11 @@ func (l *List) Pop() interface{} {
 }
 
 // Sets the current top value
-func (l *List) Set(v interface{}) {
+func (l *List) Set(v interface{}) interface{} {
 	if l.Len() > 0 {
 		l.r.Value = v
 	}
+	return v
 }
 
 // String returns the CURRENT value of the list as a string
