@@ -95,6 +95,9 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 	// Step through pre Conditions to determine whether this
 	// task should be executed
 	for _, cond := range s.Conditions[n] {
+		if !cond.Flags().IsSet(config.CondBefore) {
+			continue
+		}
 		err = cond.Check(ctx)
 		switch err {
 		case nil:
@@ -104,13 +107,16 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 			g.Status = global.StatusSkip
 			res.Err = err
 			return res
+		default:
+			// Unknown error, return the error
+			res.Err = err
+			return res
 		}
 	}
 
 	taskErr = tsk.Execute(ctx)
 	if taskErr != nil {
 		res.Err = taskErr
-		return res
 	}
 
 	// Capture this task's output if the task provides it
@@ -119,14 +125,22 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 	// Step through post conditions to evaluate if the task executed
 	// successfully
 	for _, cond := range s.Conditions[n] {
+		if !cond.Flags().IsSet(config.CondAfter) {
+			continue
+		}
 		err = cond.Check(ctx)
 		switch err {
 		case nil:
-			g.Status = global.StatusSuccess
-			return res
+			// Success if no error on task execution
+			if taskErr == nil {
+				g.Status = global.StatusSuccess
+				return res
+			}
 		case condition.ErrAbort, condition.ErrFail:
 			g.Status = global.StatusFail
-			res.Err = err
+			if taskErr == nil {
+				res.Err = err
+			}
 			return res
 		case condition.ErrRetry:
 			// Retry task until condition tells us not to
@@ -134,10 +148,10 @@ func (s *Sequence) executeStep(ctx context.Context, n int) *Result {
 				taskErr = tsk.Execute(ctx)
 				if taskErr != nil {
 					res.Err = taskErr
-					return res
 				}
 				err = cond.Check(ctx)
 			}
+			res.Err = err
 		}
 	}
 

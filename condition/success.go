@@ -1,6 +1,9 @@
 package condition
 
-import "github.com/martianmarvin/gidra/template"
+import (
+	"github.com/martianmarvin/gidra/config"
+	"github.com/martianmarvin/gidra/template"
+)
 
 // Success returns nil if it is met, and an error otherwise
 // MET - nil
@@ -15,7 +18,7 @@ func NewSuccess() Condition {
 		condition: &condition{
 			tmpl: tmpl,
 			err:  ErrFail,
-			flag: After,
+			flag: config.CondAfter,
 		},
 	}
 }

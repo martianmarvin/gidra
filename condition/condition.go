@@ -31,18 +31,6 @@ var (
 	DefaultRetryLimit = 5
 )
 
-// Flags determining when condition should be checked
-const (
-	// Condition runs before task execution
-	Before config.Flag = 1 << iota
-
-	// Condition runs after task execution
-	After
-
-	// Condition only runs once during the entire sequence
-	Once
-)
-
 // CallBackFunc represents an optional function to call if condition is met
 type CallBackFunc func(ctx context.Context) error
 
@@ -63,7 +51,7 @@ type Condition interface {
 
 	// Flags returns the execution flags that determine how this condition
 	// should run
-	Flags() config.Flag
+	Flags() *config.Flag
 }
 
 //Returns a slice containing a single condition
@@ -156,6 +144,6 @@ func (c *condition) Check(ctx context.Context) error {
 	}
 }
 
-func (c *condition) Flags() config.Flag {
-	return c.flag
+func (c *condition) Flags() *config.Flag {
+	return &c.flag
 }

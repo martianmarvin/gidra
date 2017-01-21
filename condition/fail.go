@@ -3,6 +3,7 @@ package condition
 import (
 	"context"
 
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/template"
 )
 
@@ -23,7 +24,7 @@ func NewFail(callbacks ...CallBackFunc) Condition {
 		condition: &condition{
 			tmpl: tmpl,
 			err:  ErrFail,
-			flag: After,
+			flag: config.CondAfter,
 		},
 		callbacks: callbacks,
 	}

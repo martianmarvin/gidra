@@ -3,6 +3,7 @@ package condition
 import (
 	"context"
 
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/template"
 )
 
@@ -35,7 +36,7 @@ func NewRetry(limit int, callbacks ...CallBackFunc) Condition {
 		condition: &condition{
 			tmpl: tmpl,
 			err:  ErrRetry,
-			flag: After,
+			flag: config.CondAfter,
 		},
 		RetryLimit: limit,
 		callbacks:  callbacks,

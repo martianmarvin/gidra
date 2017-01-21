@@ -3,6 +3,7 @@ package condition
 import (
 	"context"
 
+	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/template"
 )
 
@@ -21,7 +22,7 @@ func NewOnly() Condition {
 		condition: &condition{
 			tmpl: tmpl,
 			err:  ErrSkip,
-			flag: Before,
+			flag: config.CondBefore,
 		},
 	}
 }
