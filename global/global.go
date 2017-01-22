@@ -26,6 +26,7 @@ type Global struct {
 	Vars map[string]interface{}
 
 	// Proxy represents the proxy list used by the task
+	// TODO: Rotate per input?
 	Proxy *List
 
 	// Page is the page requested by the last request

@@ -1,18 +1,17 @@
 package template
 
 import (
-	"container/list"
-	"container/ring"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"text/template"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/martianmarvin/gidra/datasource"
+	"github.com/martianmarvin/gidra/global"
 )
 
 func init() {
@@ -48,10 +47,12 @@ func initFuncMap() {
 		"eq": strEq,
 		// Get environment variable
 		"env": getEnv,
+		// Set environment variable
+		"setenv": setEnv,
 		// Advance an iterable to the next position
 		"next": next,
-		// Return a random element of the list
-		"pick": pickRand,
+		// Shuffle the list so the value is random
+		"shuf": shuffle,
 		// Match a regex
 		"match": matchRegex,
 		// Get the output of running a shell command
@@ -62,6 +63,8 @@ func initFuncMap() {
 		"echo": echo,
 		// For debugging, dump the object
 		"dump": sdump,
+		// Returns true/false whether a string contains the input
+		"in": inStr,
 	}
 
 }
@@ -70,27 +73,24 @@ func getEnv(k string) string {
 	return os.Getenv(k)
 }
 
+func setEnv(k, v string) error {
+	return os.Setenv(k, v)
+}
+
 func next(iter interface{}) interface{} {
 	switch r := iter.(type) {
 	case datasource.ReadableTable:
 		res, _ := r.Next()
 		return res
-	case ring.Ring:
-		return r.Next().Value
-	case list.List:
-		el := r.Front()
-		if el == nil {
-			return nil
-		}
-		return el.Next().Value
+	case *global.List:
+		return r.Next()
 	default:
 		return nil
 	}
 }
 
-// TODO: Fix InterfaceSlice
-func pickRand(list []interface{}) interface{} {
-	return list[rand.Intn(len(list))]
+func shuffle(l *global.List) interface{} {
+	return l.Rand()
 }
 
 func matchRegex(text, pattern string) (bool, error) {
@@ -103,6 +103,10 @@ func matchRegex(text, pattern string) (bool, error) {
 
 func strEq(a, b interface{}) bool {
 	return fmt.Sprint(a) == fmt.Sprint(b)
+}
+
+func inStr(s, sub string) bool {
+	return strings.Contains(s, sub)
 }
 
 func runShell(args ...string) (string, error) {
