@@ -116,7 +116,7 @@ func (row *Row) Append(vals ...interface{}) *Row {
 
 	for i, val := range vals {
 		pos := width + i
-		row.data.Set(row.headers[pos], val)
+		row.set(row.headers[pos], val)
 	}
 
 	return row
@@ -153,9 +153,23 @@ func (row *Row) SetMap(m map[string]interface{}) *Row {
 // Set sets a single value
 func (row *Row) Set(key string, val interface{}) *Row {
 	if row.ColumnIndex(key) >= 0 {
-		row.data.Set(key, val)
+		row.set(key, val)
 	} else {
 		row.AppendKV(key, val)
 	}
 	return row
+}
+
+// interface to the underlying simplejson object
+func (row *Row) set(key string, val interface{}) {
+	// Workaround for stupid simplejson string array bug
+	if ov, ok := val.([]string); ok {
+		vals := make([]interface{}, len(ov))
+		for i, v := range ov {
+			vals[i] = v
+		}
+		row.data.Set(key, vals)
+	} else {
+		row.data.Set(key, val)
+	}
 }

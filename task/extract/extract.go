@@ -12,7 +12,6 @@ import (
 	"github.com/andybalholm/cascadia"
 	"github.com/martianmarvin/gidra/client"
 	"github.com/martianmarvin/gidra/task"
-	"github.com/martianmarvin/vars"
 )
 
 var (
@@ -166,9 +165,6 @@ func (t *Task) Execute(ctx context.Context) error {
 		return errors.New("A regex or element selector is required to extract")
 	}
 
-	taskVars := vars.FromContext(ctx)
-	extracted := taskVars.Get(rk).MustStringArray()
-
 	// If no text is provided, default to the last response from the client
 	if len(t.Config.Text) > 0 {
 		text = t.Config.Text
@@ -210,18 +206,20 @@ func (t *Task) Execute(ctx context.Context) error {
 		return err
 	}
 
+	extracted := t.Row().Get(rk).MustStringArray()
+
 	for _, res := range results {
 		if t.Config.TrimSpace {
 			res = strings.TrimSpace(res)
 		}
 		extracted = append(extracted, res)
 	}
-	taskVars.SetPath(rk, extracted)
 
 	// Write to output
+	t.Row().Set(rk, extracted)
 	for i, v := range extracted {
 		k := fmt.Sprintf("%s.%d", rk, i)
-		t.Row().AppendKV(k, v)
+		t.Row().Set(k, v)
 	}
 
 	return err

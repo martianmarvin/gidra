@@ -7,7 +7,6 @@ import (
 
 	"github.com/martianmarvin/gidra/config"
 	"github.com/martianmarvin/gidra/task"
-	"github.com/martianmarvin/vars"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,15 +28,18 @@ func testExtract(t *testing.T, conf, expected string) {
 	r := strings.NewReader(conf)
 	cfg := config.Must(config.ParseYaml(r))
 	cfg.Set("text", testText)
-	tsk := task.New("extract")
+	tsk := New()
 
 	ctx := config.ToContext(context.Background(), cfg)
-	ctx = vars.ToContext(ctx, vars.New())
-	err := tsk.Execute(ctx)
+	cTask := tsk.(task.Configurable)
+	err := cTask.Configure(cfg)
+	require.NoError(err)
+	err = tsk.Execute(ctx)
 	require.NoError(err)
 
-	taskVars := vars.FromContext(ctx)
-	res, err := taskVars.Get("result").StringArray()
+	wTask := tsk.(task.Writeable)
+
+	res, err := wTask.Row().Get("result").StringArray()
 	assert.NoError(err)
 	require.Len(res, 1)
 	assert.Equal(expected, res[0])
